@@ -1,0 +1,67 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "ZSeanYves/MoonbitBSON"
+
+// Values
+fn bson_array() -> BsonValue
+
+fn bson_bool(Bool) -> BsonValue
+
+fn bson_document() -> BsonValue
+
+fn bson_double(Float) -> BsonValue
+
+fn bson_int32(Int) -> BsonValue
+
+fn bson_int64(Int) -> BsonValue
+
+fn bson_null() -> BsonValue
+
+fn bson_string(String) -> BsonValue
+
+fn decode_bson(Bytes) -> BsonValue raise
+
+fn encode_bson(BsonValue) -> Bytes raise
+
+fn from_bson(Bytes) -> BsonValue raise
+
+fn from_bson_safe(Bytes) -> BsonValue
+
+fn to_bson(BsonValue) -> Bytes raise
+
+fn to_bson_safe(BsonValue) -> Bytes
+
+// Types and methods
+pub suberror BsonError {
+  InvalidString(String)
+  UnsupportedType(Byte)
+  InvalidUtf8(String)
+  InvalidDocumentLength(String)
+  InvalidStringLength(String)
+}
+
+pub enum BsonValue {
+  Double(Float)
+  String(String)
+  Document(Map[String, BsonValue])
+  Array(Array[BsonValue])
+  Boolean(Bool)
+  Null
+  Int32(Int)
+  Int64(Int)
+}
+fn BsonValue::as_array(Self) -> Array[Self]?
+fn BsonValue::as_document(Self) -> Map[String, Self]?
+fn BsonValue::as_int32(Self) -> Int?
+fn BsonValue::as_int64(Self) -> Int?
+fn BsonValue::as_string(Self) -> String?
+fn BsonValue::is_array(Self) -> Bool
+fn BsonValue::is_document(Self) -> Bool
+fn BsonValue::is_int(Self) -> Bool
+fn BsonValue::is_string(Self) -> Bool
+fn BsonValue::push(Self, Self) -> Self
+fn BsonValue::set(Self, String, Self) -> Self
+
+// Type aliases
+
+// Traits
+

@@ -25,6 +25,7 @@ fn encode_document(map : Map[String, BsonValue]) -> Bytes raise Error {
   }
   writer.write_byte(0x00) // document end
   let result = writer.flush()
+  writer.clear()
   let len = result.length()
   let len_bytes = encode_i32(len)
   for i in 0..<4 {
@@ -53,9 +54,12 @@ fn write_element(
   v : BsonValue,
 ) -> Unit raise Error {
   match v {
-    Double(_) => raise BsonError::UnsupportedType(0x01) // not implemented
+    Double(_) => raise BsonError::UnsupportedType(0x01) // TODO: implement f64 -> byte[8]
     String(s) => write_string(writer, s)
-    Document(m) => writer.write_all(encode_document(m).to_array())
+    Document(m) => {
+      let bytes = encode_document(m)
+      writer.write_all(bytes.to_array())
+    }
     Array(arr) => write_array(writer, arr)
     Boolean(b) => writer.write_byte(if b { 1 } else { 0 })
     Null => () // no content
@@ -73,7 +77,8 @@ fn write_array(
   for i in 0..<arr.length() {
     inner.set(i.to_string(), arr[i])
   }
-  writer.write_all(encode_document(inner).to_array())
+  let bytes = encode_document(inner)
+  writer.write_all(bytes.to_array())
 }
 
 ///| Write a CString (null-terminated)

@@ -115,7 +115,7 @@ fn decode_cstring(reader : @buffer.BufferReader) -> String raise Error {
     }
     bytes.push(b)
   }
-  bytes.to_string()
+  @buffer.utf8_bytes_to_string(Bytes::from_array(bytes))
 }
 
 // Decode UTF-8 String (Int32 length + content + 0x00)
@@ -133,7 +133,8 @@ fn decode_string(reader : @buffer.BufferReader) -> String raise Error {
   if raw[len - 1] != 0x00 {
     raise InvalidUtf8("字符串未以 null (0x00) 结尾")
   }
-  slice_array(raw, 0, len - 1).to_string()
+  let byte = Bytes::from_array(slice_array(raw, 0, len - 1))
+  @buffer.utf8_bytes_to_string(byte)
 }
 
 // Read n bytes from reader
