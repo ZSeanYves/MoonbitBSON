@@ -24,13 +24,13 @@
 ## 📆 安装方式
 
 ```bash
-moon add ZSeanYves/bsonlite
+moon add ZSeanYves/MoonbitBSON
 ```
 
 或编辑 `moon.mod.json`：
 
 ```json
-"import": ["ZSeanYves/bsonlite"]
+"import": ["ZSeanYves/MoonbitBSON"]
 ```
 
 

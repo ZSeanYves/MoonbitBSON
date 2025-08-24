@@ -24,13 +24,13 @@
 ## 📆 Installation
 
 ```bash
-moon add ZSeanYves/bsonlite
+moon add ZSeanYves/MoonbitBSON
 ```
 
 Or edit `moon.mod.json`:
 
 ```json
-"import": ["ZSeanYves/bsonlite"]
+"import": ["ZSeanYves/MoonbitBSON"]
 ```
 
 ---
