@@ -1,0 +1,18 @@
+import {
+  "moonbitlang/core/bigint",
+  "moonbitlang/core/bench",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/double",
+  "moonbitlang/core/encoding/base64",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/random",
+  "moonbitlang/core/ref",
+  "moonbitlang/core/quickcheck",
+  "moonbitlang/core/strconv",
+}
+
+options(
+  "is-main": false,
+)

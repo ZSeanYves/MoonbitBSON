@@ -1,158 +1,109 @@
-# 📦 BsonLite: MoonBit 轻量级 BSON 编/解码库
+# MoonbitBSON
 
-[English](https://github.com/ZSeanYves/BsonLite/blob/main/README.md) | [简体中文](https://github.com/ZSeanYves/BsonLite/blob/main/README_zh_CN.md)
+[English](README.md) | [简体中文](README_zh_CN.md)
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/ZSeanYves/BsonLite/bsonlite-ci.yml)](https://github.com/ZSeanYves/BsonLite/actions)
-[![License](https://img.shields.io/github/license/ZSeanYves/BsonLite)](LICENSE)
+[![License](https://img.shields.io/github/license/ZSeanYves/MoonbitBSON)](LICENSE)
 
-**BsonLite** 是一个基于 MoonBit 言语的轻量级 BSON 工具库，支持基础类型的 BSON 编码和解码，包括字符串、整数、布尔、数组、字典等。库设计简洁，调用简单，适合学习、工程实验和辅助转换等场景。
+MoonBit 的严格 BSON 1.1 编解码库。仅使用 MoonBit core，支持 wasm、wasm-gc、
+JavaScript 和 native 后端。0.3 API 新增类型化 DateTime、ObjectId、UUID、原始
+字段访问和泛型 BSON 序列化 trait。
 
----
-
-## 🚀 功能特性
-
-* 支持 BSON 格式皆必的类型：String、Int32、Bool、Document、Array
-* 封装类 Rust-like 的 `BsonValue` 进行类型表示
-* 支持嵌套文档和数组编解码
-* 用户可维护字典、数组接口进行结构
-* 简洁编/解码 API，自动处理结构长度
-* 已分类编码错误，类型无效、缺少结束符、无效长度等均有包括
-* 提供完备测试样例
-
----
-
-## 📆 安装方式
+## 安装
 
 ```bash
 moon add ZSeanYves/MoonbitBSON
 ```
 
-或编辑 `moon.mod.json`：
-
-```json
-"import": ["ZSeanYves/MoonbitBSON"]
+```moonbit
+import {
+  "ZSeanYves/MoonbitBSON",
+}
 ```
 
-
-## 🧭 支持的 BSON 类型
-
-| 枚举成员       | 负载类型                     | 备注   |
-| ---------- | ------------------------ | ---- |
-| `Double`   | `Float`                  | 0x01 |
-| `String`   | `String`                 | 0x02 |
-| `Document` | `Map[String, BsonValue]` | 0x03 |
-| `Array`    | `Array[BsonValue]`       | 0x04 |
-| `Boolean`  | `Bool`                   | 0x08 |
-| `Null`     | `-`                      | 0x0A |
-| `Int32`    | `Int`                    | 0x10 |
-| `Int64`    | `Int`                    | 0x12 |
-
-> **未覆盖**：Binary、ObjectId、UTC datetime、Regex、Timestamp、Decimal128 等扩展类型当前未实现。
-
-## 🚀 快速上手
-
-### 构造 → 编码 → 解码
+## 使用
 
 ```moonbit
-use ZSeanYves/MoonbitBSON
+let user = @MoonbitBSON.Document::new()
+  .set("name", @MoonbitBSON.Bson::String("Ada"))
+  .set("age", @MoonbitBSON.Bson::Int32(37))
+  .set("active", @MoonbitBSON.Bson::Boolean(true))
+  .set(
+    "scores",
+    @MoonbitBSON.Bson::Array([
+      @MoonbitBSON.Bson::Double(9.5),
+      @MoonbitBSON.Bson::Double(10.0),
+    ]),
+  )
 
-let user = bson_document()
-  .set("name", bson_string("Ada"))
-  .set("age",  bson_int32(30))
-  .set("tags", bson_array().push(bson_string("engineer")).push(bson_string("math")))
+let bytes = user.to_bytes()
+let decoded = @MoonbitBSON.Document::from_bytes(bytes)
 
-let bin  = to_bson(user)           // 编码为 Bytes
-let back = from_bson(bin)          // 从 Bytes 解码回 BsonValue
-
-assert(back.is_document())
-assert(back.as_document().unwrap().get("age").unwrap().as_int32().unwrap() == 30)
+assert_eq(decoded.require_string("name"), "Ada")
+assert_eq(decoded.require_int32("age"), 37)
 ```
 
-### Safe 变体（不会抛错）
+`decode` 必须完整消费一个文档并拒绝尾随字节。处理带帧数据时使用
+`decode_prefix`，它同时返回文档和已消费字节数。`RawDocument` 会验证输入并保留原始
+wire bytes，包括字段顺序和重复键。需要只查看或解码部分字段时，可使用
+`RawDocument::elements` 或 `get_element`。
 
-```moonbit
-let bin  = to_bson_safe(user)      // 出错时返回空 Bytes
-let back = from_bson_safe(bin)     // 出错时返回 BsonValue::Null
+## BSON 类型
+
+支持 Double、String、Document、Array、Binary（含新子类型）、Undefined、
+ObjectId、Boolean、UTC DateTime、Null、Regex、DBPointer、JavaScript、Symbol、
+JavaScript with scope、Int32、Timestamp、Int64、Decimal128、MinKey、MaxKey。
+
+为保证互操作性，已弃用的 BSON wire type 仍可解码。
+
+## 安全性与错误
+
+- 文档和数组的声明长度是不可越过的硬边界。
+- 严格检查尾随数据、结束符、UTF-8、Boolean byte、旧 Binary 长度、
+  ObjectId/Decimal128 大小、Regex options、嵌套深度和总大小。
+- 每个 `BsonError` 都包含分类、byte offset、文档路径和消息。
+- 按 MongoDB BSON Corpus 要求，默认接受并规范化退化数组键；严格场景可启用
+  `DecodeOptions::new(require_canonical_array_keys=true)`。
+
+## Extended JSON
+
+通过 `Document::to_extended_json`、`to_extended_json_string`、
+`from_extended_json` 和 `from_extended_json_string` 使用 Canonical Extended JSON。
+
+通过 `to_relaxed_extended_json` 和 `to_relaxed_extended_json_string` 输出 Relaxed
+Extended JSON。有限数值使用原生 JSON number；1970 年至 9999 年的 UTC DateTime
+使用 RFC 3339 字符串，范围外日期保留无损的 `$numberLong` wrapper。
+
+Decimal128 通过 `Decimal128::from_string` 和 `Decimal128::to_string` 提供精确的
+IEEE 754-2008 文本转换，包括有符号零、subnormal、指数钳制、NaN 和 infinity。
+Canonical 与 Relaxed Extended JSON 均使用标准 `$numberDecimal` 表示。
+
+`DateTime` 是类型化的 UTC 毫秒值，支持 RFC 3339 解析和格式化。`Uuid` 支持
+canonical、compact 和 URN 文本格式，以及 BSON binary subtype 4。`ObjectId::from_parts`
+允许调用方提供 timestamp、process-unique bytes 和 counter；`ObjectId::new` 提供
+本地 best-effort 生成器。
+
+`ToBson` 和 `FromBson` 提供可选的泛型转换，支持数组、Map、Option 以及类型化 BSON 值。
+
+## 开发与验证
+
+```bash
+moon fmt --check src
+moon check --target all --deny-warn --warn-list +73
+moon test --target all --deny-warn --warn-list +73
+moon test --release --target all --deny-warn --warn-list +73
+moon bench --target native --release
+moon coverage analyze -- -f summary
+moon info --target all
+moon package --list
 ```
 
-## 🔧 API 参考（完整曝光）
+测试包含 `testdata/bson-corpus` 中完整的 MongoDB BSON Corpus JSON 套件、混合文档全部
+截断点、property cases、有限 decoder fuzz smoke、畸形输入、Decimal128 文本向量以及
+Canonical/Relaxed Extended JSON。
 
-### 🏗 构造函数（Builders）
+0.3.0 破坏性迁移见 [CHANGELOG.md](CHANGELOG.md)，实现状态和剩余工作见
+[MAINTENANCE.md](MAINTENANCE.md)。
 
-| 函数              | 签名                                 | 说明                         |
-| --------------- | ---------------------------------- | -------------------------- |
-| `bson_array`    | `bson_array() -> BsonValue`        | 创建一个空的 BSON 数组（Array）。     |
-| `bson_bool`     | `bson_bool(Bool) -> BsonValue`     | 用布尔值创建 BSON Boolean 值。     |
-| `bson_document` | `bson_document() -> BsonValue`     | 创建一个空的 BSON 文档（Document）。  |
-| `bson_double`   | `bson_double(Float) -> BsonValue`  | 用 64 位浮点数创建 BSON Double 值。 |
-| `bson_int32`    | `bson_int32(Int) -> BsonValue`     | 用 32 位整型创建 BSON Int32 值。   |
-| `bson_int64`    | `bson_int64(Int) -> BsonValue`     | 用 64 位整型创建 BSON Int64 值。   |
-| `bson_null`     | `bson_null() -> BsonValue`         | 创建 BSON Null 值。            |
-| `bson_string`   | `bson_string(String) -> BsonValue` | 用给定字符串创建 BSON String 值。    |
+## 许可证
 
-### 📤 顶层编解码（Top-level Encode/Decode）
-
-| 函数               | 签名                                      | 说明                                          |
-| ---------------- | --------------------------------------- | ------------------------------------------- |
-| `decode_bson`    | `decode_bson(Bytes) -> BsonValue raise` | 从 `Bytes` 解码出一个 `BsonValue`（顶层应为 Document）。 |
-| `encode_bson`    | `encode_bson(BsonValue) -> Bytes raise` | 将一个 *Document* 作为顶层对象编码为 `Bytes`。           |
-| `from_bson`      | `from_bson(Bytes) -> BsonValue raise`   | 便捷解码封装（内部调用 `decode_bson`）。                 |
-| `from_bson_safe` | `from_bson_safe(Bytes) -> BsonValue`    | 安全解码封装：失败时返回 `BsonValue::Null`。             |
-| `to_bson`        | `to_bson(BsonValue) -> Bytes raise`     | 便捷编码封装（内部调用 `encode_bson`）。                 |
-| `to_bson_safe`   | `to_bson_safe(BsonValue) -> Bytes`      | 安全编码封装：失败时返回空 `Bytes`。                      |
-
-### 🧱 `BsonValue` 方法
-
-| 方法                       | 签名                                                   | 说明                                          |
-| ------------------------ | ---------------------------------------------------- | ------------------------------------------- |
-| `BsonValue::as_array`    | `BsonValue::as_array(Self) -> Array[Self]?`          | 如果是 Array，返回元素数组；否则返回 None。                 |
-| `BsonValue::as_document` | `BsonValue::as_document(Self) -> Map[String, Self]?` | 如果是 Document，返回 Map；否则返回 None。              |
-| `BsonValue::as_int32`    | `BsonValue::as_int32(Self) -> Int?`                  | 如果是 Int32，返回 Int；否则返回 None。                 |
-| `BsonValue::as_int64`    | `BsonValue::as_int64(Self) -> Int?`                  | 如果是 Int64，返回 Int；否则返回 None。                 |
-| `BsonValue::as_string`   | `BsonValue::as_string(Self) -> String?`              | 如果是 String，返回 String；否则返回 None。             |
-| `BsonValue::is_array`    | `BsonValue::is_array(Self) -> Bool`                  | 是否为 Array。                                  |
-| `BsonValue::is_document` | `BsonValue::is_document(Self) -> Bool`               | 是否为 Document。                               |
-| `BsonValue::is_int`      | `BsonValue::is_int(Self) -> Bool`                    | 是否为整型（Int32/Int64）。                         |
-| `BsonValue::is_string`   | `BsonValue::is_string(Self) -> Bool`                 | 是否为 String。                                 |
-| `BsonValue::push`        | `BsonValue::push(Self, Self) -> Self`                | （仅 Array 有效）追加一个元素并返回修改后的 Array，支持链式调用。     |
-| `BsonValue::set`         | `BsonValue::set(Self, String, Self) -> Self`         | （仅 Document 有效）设置字段并返回修改后的 Document，支持链式调用。 |
-
-### ⚠️ 错误类型
-
-`BsonError`（子错误枚举 `suberror`）可能在编/解码时被抛出：
-
-| 成员                      | 负载       |
-| ----------------------- | -------- |
-| `InvalidString`         | `String` |
-| `UnsupportedType`       | `Byte`   |
-| `InvalidUtf8`           | `String` |
-| `InvalidDocumentLength` | `String` |
-| `InvalidStringLength`   | `String` |
-
-### 🧭 常用操作示例
-
-```moonbit
-// 构造数组并读取
-let arr = bson_array().push(bson_int32(1)).push(bson_int32(2))
-assert(arr.is_array())
-let xs = arr.as_array().unwrap()
-assert(xs.length() == 2)
-
-// 文档嵌套
-let profile = bson_document()
-  .set("name", bson_string("Grace"))
-  .set("likes", arr)
-```
-
-## ❗ 已知限制
-
-* 仅实现了上表列出的 BSON 类型，暂未覆盖 Binary、ObjectId 等扩展类型。
-* 目前 `Int64` 的行为在不同运行环境可能存在兼容性差异，建议仅在确有需要时使用。
-
-## 🧪 测试
-
-见 `src/bson_test.mbt`，可根据 MoonBit 的测试命令运行。
-
-## 📜 版权
-
-本项目基于 Apache-2.0 许可证发布。详见 LICENSE。
+Apache-2.0，详见 [LICENSE](LICENSE)。

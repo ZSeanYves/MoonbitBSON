@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-moonbit@v1.22
+      - run: moon version
+      - run: moon fmt --check src
+      - run: moon check --target all --deny-warn --warn-list +73
+      - run: moon test --target all --deny-warn --warn-list +73
+      - run: moon test --release --target all --deny-warn --warn-list +73
+      - run: moon bench --target native --release
+      - run: moon coverage analyze -- -f summary
+      - run: moon info --target all
+      - run: moon package --list

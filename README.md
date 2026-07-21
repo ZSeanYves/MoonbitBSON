@@ -1,173 +1,119 @@
-# 📦 BsonLite: A Lightweight BSON Encoder/Decoder for MoonBit
+# MoonbitBSON
 
-[English](https://github.com/ZSeanYves/BsonLite/blob/main/README.md) | [简体中文](https://github.com/ZSeanYves/BsonLite/blob/main/README_zh_CN.md)
+[English](README.md) | [简体中文](README_zh_CN.md)
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/ZSeanYves/BsonLite/bsonlite-ci.yml)](https://github.com/ZSeanYves/BsonLite/actions)
-[![License](https://img.shields.io/github/license/ZSeanYves/BsonLite)](LICENSE)
+[![License](https://img.shields.io/github/license/ZSeanYves/MoonbitBSON)](LICENSE)
 
-**BsonLite** is a lightweight BSON utility library for **MoonBit**. It supports encoding and decoding the core BSON types (strings, integers, booleans, arrays, and documents). The API is small and easy to use, suitable for learning, experiments, and format conversion tasks.
+Strict BSON 1.1 encoding and decoding for MoonBit. The package uses only
+MoonBit core libraries and supports wasm, wasm-gc, JavaScript, and native.
+The 0.3 API adds typed DateTime, ObjectId, UUID, raw element access, and
+generic BSON serialization traits.
 
----
-
-## 🚀 Features
-
-* Supports core BSON types: **String**, **Int32**, **Bool**, **Document**, **Array**
-* Rust-like `BsonValue` enum for type-safe construction & traversal
-* Full support for nested documents and arrays
-* Chainable, ergonomic APIs to build maps and arrays
-* Simple encode/decode functions with automatic length handling
-* Categorized errors: invalid types, missing terminator, invalid length, etc.
-* Comes with test samples
-
----
-
-## 📆 Installation
+## Install
 
 ```bash
 moon add ZSeanYves/MoonbitBSON
 ```
 
-Or edit `moon.mod.json`:
-
-```json
-"import": ["ZSeanYves/MoonbitBSON"]
+```moonbit
+import {
+  "ZSeanYves/MoonbitBSON",
+}
 ```
 
----
-
-## 🧭 Supported BSON Types
-
-| Variant    | Payload Type             | Tag  |
-| ---------- | ------------------------ | ---- |
-| `Double`   | `Float`                  | 0x01 |
-| `String`   | `String`                 | 0x02 |
-| `Document` | `Map[String, BsonValue]` | 0x03 |
-| `Array`    | `Array[BsonValue]`       | 0x04 |
-| `Boolean`  | `Bool`                   | 0x08 |
-| `Null`     | `-`                      | 0x0A |
-| `Int32`    | `Int`                    | 0x10 |
-| `Int64`    | `Int`                    | 0x12 |
-
-> **Not covered yet:** Binary, ObjectId, UTC datetime, Regex, Timestamp, Decimal128, and other extended BSON types.
-
----
-
-## 🚀 Quick Start
-
-### Build → Encode → Decode
+## Usage
 
 ```moonbit
-use ZSeanYves/bsonlite
+let user = @MoonbitBSON.Document::new()
+  .set("name", @MoonbitBSON.Bson::String("Ada"))
+  .set("age", @MoonbitBSON.Bson::Int32(37))
+  .set("active", @MoonbitBSON.Bson::Boolean(true))
+  .set(
+    "scores",
+    @MoonbitBSON.Bson::Array([
+      @MoonbitBSON.Bson::Double(9.5),
+      @MoonbitBSON.Bson::Double(10.0),
+    ]),
+  )
 
-let user = bson_document()
-  .set("name", bson_string("Ada"))
-  .set("age",  bson_int32(30))
-  .set("tags", bson_array().push(bson_string("engineer")).push(bson_string("math")))
+let bytes = user.to_bytes()
+let decoded = @MoonbitBSON.Document::from_bytes(bytes)
 
-let bin  = to_bson(user)      // Encode to Bytes
-let back = from_bson(bin)     // Decode from Bytes back to BsonValue
-
-assert(back.is_document())
-assert(back.as_document().unwrap().get("age").unwrap().as_int32().unwrap() == 30)
+assert_eq(decoded.require_string("name"), "Ada")
+assert_eq(decoded.require_int32("age"), 37)
 ```
 
-### Safe Variants (No Exceptions)
+`decode` rejects trailing bytes. For framed data, use `decode_prefix`, which
+returns the decoded document and consumed byte count. `RawDocument` validates
+and preserves the original wire bytes, including order and duplicate keys.
+Use `RawDocument::elements` or `get_element` when a caller needs to inspect or
+decode only selected fields.
 
-```moonbit
-let bin  = to_bson_safe(user)   // Returns empty Bytes on error
-let back = from_bson_safe(bin)  // Returns BsonValue::Null on error
+## Supported BSON types
+
+Double, String, Document, Array, Binary (including modern subtypes), Undefined,
+ObjectId, Boolean, UTC DateTime, Null, Regex, DBPointer, JavaScript, Symbol,
+JavaScript with scope, Int32, Timestamp, Int64, Decimal128, MinKey, and MaxKey.
+
+Deprecated BSON wire types remain decodable for interoperability.
+
+## Safety and errors
+
+- Declared document and array lengths are hard boundaries.
+- Exact decoding rejects trailing bytes and invalid terminators.
+- UTF-8, Boolean bytes, old binary lengths, ObjectId/Decimal128 sizes, Regex
+  options, depth, and total size are validated.
+- Every `BsonError` carries a category, byte offset, document path, and message.
+- Degenerate BSON array keys are accepted and normalized as required by the
+  MongoDB BSON Corpus. Strict applications can enable
+  `DecodeOptions::new(require_canonical_array_keys=true)`.
+
+## Extended JSON
+
+Canonical Extended JSON encoding and parsing is available through
+`Document::to_extended_json`, `to_extended_json_string`,
+`from_extended_json`, and `from_extended_json_string`.
+
+Relaxed output is available through `to_relaxed_extended_json` and
+`to_relaxed_extended_json_string`. It emits finite numbers as native JSON and
+UTC DateTime values from 1970 through year 9999 as RFC 3339 strings; dates
+outside that range retain the lossless `$numberLong` wrapper.
+
+Decimal128 supports exact IEEE 754-2008 text conversion through
+`Decimal128::from_string` and `Decimal128::to_string`, including signed zero,
+subnormal values, exponent clamping, NaN, and infinity. Canonical and Relaxed
+Extended JSON both use the standard `$numberDecimal` representation.
+
+`DateTime` is a typed UTC millisecond value with RFC 3339 parsing and
+formatting. `Uuid` supports canonical, compact, and URN text forms and BSON
+binary subtype 4. `ObjectId::from_parts` accepts caller-controlled timestamp,
+process-unique bytes, and counter values; `ObjectId::new` provides a
+best-effort local generator.
+
+`ToBson` and `FromBson` provide opt-in generic conversions for application
+types, including arrays, maps, options, and the typed BSON values.
+
+## Development
+
+```bash
+moon fmt --check src
+moon check --target all --deny-warn --warn-list +73
+moon test --target all --deny-warn --warn-list +73
+moon test --release --target all --deny-warn --warn-list +73
+moon bench --target native --release
+moon coverage analyze -- -f summary
+moon info --target all
+moon package --list
 ```
 
----
+Tests include the complete MongoDB BSON Corpus JSON suite vendored under
+`testdata/bson-corpus`, all truncation points for mixed documents, generated
+property cases, bounded decoder fuzz smoke cases, strict malformed-input cases,
+Decimal128 text vectors, and Canonical/Relaxed Extended JSON.
 
-## 🔧 API Reference (Complete)
+See [CHANGELOG.md](CHANGELOG.md) for the breaking 0.3.0 migration and
+[MAINTENANCE.md](MAINTENANCE.md) for implementation status and remaining work.
 
-### 🏗 Builders
+## License
 
-| Function        | Signature                          | Description                             |
-| --------------- | ---------------------------------- | --------------------------------------- |
-| `bson_array`    | `bson_array() -> BsonValue`        | Create an empty BSON **Array**.         |
-| `bson_bool`     | `bson_bool(Bool) -> BsonValue`     | Create a BSON **Boolean** from a bool.  |
-| `bson_document` | `bson_document() -> BsonValue`     | Create an empty BSON **Document**.      |
-| `bson_double`   | `bson_double(Float) -> BsonValue`  | Create a BSON **Double** from a float.  |
-| `bson_int32`    | `bson_int32(Int) -> BsonValue`     | Create a BSON **Int32** from an int.    |
-| `bson_int64`    | `bson_int64(Int) -> BsonValue`     | Create a BSON **Int64** from an int.    |
-| `bson_null`     | `bson_null() -> BsonValue`         | Create a BSON **Null**.                 |
-| `bson_string`   | `bson_string(String) -> BsonValue` | Create a BSON **String** from a string. |
-
-### 📤 Top-level Encode/Decode
-
-| Function         | Signature                               | Description                                                         |
-| ---------------- | --------------------------------------- | ------------------------------------------------------------------- |
-| `decode_bson`    | `decode_bson(Bytes) -> BsonValue raise` | Decode `Bytes` into a `BsonValue` (top-level should be a Document). |
-| `encode_bson`    | `encode_bson(BsonValue) -> Bytes raise` | Encode a top-level **Document** as `Bytes`.                         |
-| `from_bson`      | `from_bson(Bytes) -> BsonValue raise`   | Convenience wrapper around `decode_bson`.                           |
-| `from_bson_safe` | `from_bson_safe(Bytes) -> BsonValue`    | Safe decode wrapper: returns `BsonValue::Null` on failure.          |
-| `to_bson`        | `to_bson(BsonValue) -> Bytes raise`     | Convenience wrapper around `encode_bson`.                           |
-| `to_bson_safe`   | `to_bson_safe(BsonValue) -> Bytes`      | Safe encode wrapper: returns empty `Bytes` on failure.              |
-
-### 🧱 `BsonValue` Methods
-
-| Method                   | Signature                                           | Description                                      |
-| ------------------------ | --------------------------------------------------- | ------------------------------------------------ |
-| `BsonValue::as_array`    | `BsonValue::as_array(Self) -> Array[Self]?`         | If Array, return its elements; otherwise `None`. |
-| `BsonValue::as_document` | `BsonValue::as_document(Self) -> Map[String,Self]?` | If Document, return the map; otherwise `None`.   |
-| `BsonValue::as_int32`    | `BsonValue::as_int32(Self) -> Int?`                 | If Int32, return the integer; otherwise `None`.  |
-| `BsonValue::as_int64`    | `BsonValue::as_int64(Self) -> Int?`                 | If Int64, return the integer; otherwise `None`.  |
-| `BsonValue::as_string`   | `BsonValue::as_string(Self) -> String?`             | If String, return the string; otherwise `None`.  |
-| `BsonValue::is_array`    | `BsonValue::is_array(Self) -> Bool`                 | Whether it’s an Array.                           |
-| `BsonValue::is_document` | `BsonValue::is_document(Self) -> Bool`              | Whether it’s a Document.                         |
-| `BsonValue::is_int`      | `BsonValue::is_int(Self) -> Bool`                   | Whether it’s an integer type (Int32/Int64).      |
-| `BsonValue::is_string`   | `BsonValue::is_string(Self) -> Bool`                | Whether it’s a String.                           |
-| `BsonValue::push`        | `BsonValue::push(Self, Self) -> Self`               | **Array only**: append an element (chainable).   |
-| `BsonValue::set`         | `BsonValue::set(Self, String, Self) -> Self`        | **Document only**: set a field (chainable).      |
-
----
-
-## ⚠️ Error Types
-
-`BsonError` (a `suberror` enum) may be raised during encode/decode:
-
-| Variant                 | Payload  |
-| ----------------------- | -------- |
-| `InvalidString`         | `String` |
-| `UnsupportedType`       | `Byte`   |
-| `InvalidUtf8`           | `String` |
-| `InvalidDocumentLength` | `String` |
-| `InvalidStringLength`   | `String` |
-
----
-
-## 🧭 Common Patterns
-
-```moonbit
-// Build and read an array
-let arr = bson_array().push(bson_int32(1)).push(bson_int32(2))
-assert(arr.is_array())
-let xs = arr.as_array().unwrap()
-assert(xs.length() == 2)
-
-// Nested documents
-let profile = bson_document()
-  .set("name", bson_string("Grace"))
-  .set("likes", arr)
-```
-
----
-
-## ❗ Limitations
-
-* Only the types listed above are implemented; extended BSON types (Binary, ObjectId, etc.) are not supported yet.
-* `Int64` behavior may vary across environments—use with care when portability is required.
-
----
-
-## 🧪 Tests
-
-See `src/bson_test.mbt` and run with your usual MoonBit test commands.
-
----
-
-## 📜 License
-
-Licensed under **Apache-2.0**. See [LICENSE](LICENSE) for details.
+Apache-2.0. See [LICENSE](LICENSE).

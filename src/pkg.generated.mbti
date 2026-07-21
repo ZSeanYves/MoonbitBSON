@@ -1,0 +1,344 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "ZSeanYves/MoonbitBSON"
+
+import {
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn decode(Bytes) -> Document raise BsonError
+
+pub fn decode_prefix(BytesView) -> (Document, Int) raise BsonError
+
+pub fn decode_prefix_with_options(BytesView, DecodeOptions) -> (Document, Int) raise BsonError
+
+pub fn decode_with_options(Bytes, DecodeOptions) -> Document raise BsonError
+
+pub fn[T : FromBson] deserialize_from_bytes(Bytes) -> T raise BsonError
+
+pub fn encode(Document) -> Bytes raise BsonError
+
+pub fn encode_to(Document, @buffer.Buffer) -> Unit raise BsonError
+
+pub fn encode_to_with_options(Document, @buffer.Buffer, EncodeOptions) -> Unit raise BsonError
+
+pub fn encode_with_options(Document, EncodeOptions) -> Bytes raise BsonError
+
+pub fn[T : FromBson] from_bson(Bson) -> T raise BsonError
+
+pub fn[T : ToBson] serialize_to_bytes(T) -> Bytes raise BsonError
+
+pub fn[T : ToBson] to_bson(T) -> Bson raise BsonError
+
+// Errors
+pub suberror BsonError {
+  Failure(BsonErrorInfo)
+} derive(Eq, @debug.Debug)
+pub fn BsonError::info(Self) -> BsonErrorInfo
+
+// Types and methods
+pub struct Binary {
+  subtype : BinarySubtype
+  bytes : Bytes
+} derive(Eq, @debug.Debug)
+pub fn Binary::as_uuid(Self) -> Uuid?
+pub fn Binary::bytes(Self) -> Bytes
+pub fn Binary::new(BinarySubtype, Bytes) -> Self
+pub fn Binary::subtype(Self) -> BinarySubtype
+
+pub(all) enum BinarySubtype {
+  Generic
+  Function
+  BinaryOld
+  UuidOld
+  Uuid
+  Md5
+  Encrypted
+  Column
+  Sensitive
+  Vector
+  Reserved(Byte)
+  UserDefined(Byte)
+} derive(Eq, @debug.Debug)
+pub fn BinarySubtype::from_byte(Byte) -> Self
+pub fn BinarySubtype::to_byte(Self) -> Byte
+
+pub(all) enum Bson {
+  Double(Double)
+  String(String)
+  Document(Document)
+  Array(Array[Bson])
+  Binary(Binary)
+  Undefined
+  ObjectId(ObjectId)
+  Boolean(Bool)
+  DateTime(DateTime)
+  Null
+  Regex(Regex)
+  DbPointer(DbPointer)
+  JavaScript(String)
+  Symbol(String)
+  JavaScriptWithScope(JavaScriptWithScope)
+  Int32(Int)
+  Timestamp(Timestamp)
+  Int64(Int64)
+  Decimal128(Decimal128)
+  MinKey
+  MaxKey
+} derive(Eq, @debug.Debug)
+pub fn Bson::as_array(Self) -> Array[Self]?
+pub fn Bson::as_binary(Self) -> Binary?
+pub fn Bson::as_bool(Self) -> Bool?
+pub fn Bson::as_datetime(Self) -> DateTime?
+pub fn Bson::as_decimal128(Self) -> Decimal128?
+pub fn Bson::as_document(Self) -> Document?
+pub fn Bson::as_double(Self) -> Double?
+pub fn Bson::as_int32(Self) -> Int?
+pub fn Bson::as_int64(Self) -> Int64?
+pub fn Bson::as_object_id(Self) -> ObjectId?
+pub fn Bson::as_regex(Self) -> Regex?
+pub fn Bson::as_string(Self) -> String?
+pub fn Bson::as_timestamp(Self) -> Timestamp?
+pub fn Bson::as_uuid(Self) -> Uuid?
+pub fn Bson::from_extended_json(Json) -> Self raise BsonError
+pub fn Bson::to_extended_json(Self) -> Json raise BsonError
+pub fn Bson::to_relaxed_extended_json(Self) -> Json raise BsonError
+pub fn Bson::type_name(Self) -> String
+pub impl FromBson for Bson
+pub impl ToBson for Bson
+
+pub struct BsonErrorInfo {
+  kind : BsonErrorKind
+  offset : Int
+  path : String
+  message : String
+} derive(Eq, @debug.Debug)
+pub fn BsonErrorInfo::kind(Self) -> BsonErrorKind
+pub fn BsonErrorInfo::message(Self) -> String
+pub fn BsonErrorInfo::offset(Self) -> Int
+pub fn BsonErrorInfo::path(Self) -> String
+
+pub(all) enum BsonErrorKind {
+  UnexpectedEnd
+  InvalidLength
+  InvalidUtf8
+  InvalidCString
+  InvalidBoolean
+  InvalidArrayIndex
+  InvalidBinary
+  InvalidObjectId
+  InvalidUuid
+  InvalidDateTime
+  InvalidDecimal128
+  InvalidRegex
+  UnsupportedType
+  TrailingData
+  DepthLimit
+  SizeLimit
+  InvalidExtendedJson
+  TypeMismatch
+} derive(Eq, @debug.Debug)
+
+pub struct DateTime {
+  milliseconds : Int64
+} derive(Eq, @debug.Debug)
+pub fn DateTime::from_millis(Int64) -> Self
+pub fn DateTime::from_rfc3339(String) -> Self raise BsonError
+pub fn DateTime::now() -> Self
+pub fn DateTime::to_millis(Self) -> Int64
+pub fn DateTime::to_rfc3339(Self) -> String raise BsonError
+pub impl FromBson for DateTime
+pub impl ToBson for DateTime
+
+pub struct DbPointer {
+  collection : String
+  id : ObjectId
+} derive(Eq, @debug.Debug)
+pub fn DbPointer::collection(Self) -> String
+pub fn DbPointer::id(Self) -> ObjectId
+pub fn DbPointer::new(String, ObjectId) -> Self
+
+pub struct Decimal128 {
+  bytes : Bytes
+} derive(Eq, @debug.Debug)
+pub fn Decimal128::bytes(Self) -> Bytes
+pub fn Decimal128::from_bytes(Bytes) -> Self raise BsonError
+pub fn Decimal128::from_string(String) -> Self raise BsonError
+pub fn Decimal128::to_string(Self) -> String
+pub impl FromBson for Decimal128
+pub impl ToBson for Decimal128
+
+pub struct DecodeOptions {
+  max_depth : Int
+  max_size : Int
+  require_canonical_array_keys : Bool
+} derive(Eq, @debug.Debug)
+pub fn DecodeOptions::max_depth(Self) -> Int
+pub fn DecodeOptions::max_size(Self) -> Int
+pub fn DecodeOptions::new(max_depth? : Int, max_size? : Int, require_canonical_array_keys? : Bool) -> Self
+pub fn DecodeOptions::require_canonical_array_keys(Self) -> Bool
+
+pub struct Document {
+  values : Map[String, Bson]
+} derive(Eq, @debug.Debug)
+pub fn Document::contains(Self, String) -> Bool
+pub fn Document::entries(Self) -> Array[(String, Bson)]
+pub fn Document::from_array(Array[(String, Bson)]) -> Self
+pub fn Document::from_bytes(Bytes) -> Self raise BsonError
+pub fn Document::from_extended_json(Json) -> Self raise BsonError
+pub fn Document::from_extended_json_string(String) -> Self raise BsonError
+pub fn Document::get(Self, String) -> Bson?
+pub fn Document::get_array(Self, String) -> Array[Bson]?
+pub fn Document::get_binary(Self, String) -> Binary?
+pub fn Document::get_bool(Self, String) -> Bool?
+pub fn Document::get_datetime(Self, String) -> DateTime?
+pub fn Document::get_decimal128(Self, String) -> Decimal128?
+pub fn Document::get_document(Self, String) -> Self?
+pub fn Document::get_double(Self, String) -> Double?
+pub fn Document::get_int32(Self, String) -> Int?
+pub fn Document::get_int64(Self, String) -> Int64?
+pub fn Document::get_object_id(Self, String) -> ObjectId?
+pub fn Document::get_regex(Self, String) -> Regex?
+pub fn Document::get_string(Self, String) -> String?
+pub fn Document::get_timestamp(Self, String) -> Timestamp?
+pub fn Document::get_uuid(Self, String) -> Uuid?
+pub fn Document::is_empty(Self) -> Bool
+pub fn Document::length(Self) -> Int
+pub fn Document::new() -> Self
+pub fn Document::remove(Self, String) -> Unit
+pub fn Document::require(Self, String) -> Bson raise BsonError
+pub fn Document::require_array(Self, String) -> Array[Bson] raise BsonError
+pub fn Document::require_binary(Self, String) -> Binary raise BsonError
+pub fn Document::require_bool(Self, String) -> Bool raise BsonError
+pub fn Document::require_datetime(Self, String) -> DateTime raise BsonError
+pub fn Document::require_decimal128(Self, String) -> Decimal128 raise BsonError
+pub fn Document::require_document(Self, String) -> Self raise BsonError
+pub fn Document::require_double(Self, String) -> Double raise BsonError
+pub fn Document::require_int32(Self, String) -> Int raise BsonError
+pub fn Document::require_int64(Self, String) -> Int64 raise BsonError
+pub fn Document::require_object_id(Self, String) -> ObjectId raise BsonError
+pub fn Document::require_regex(Self, String) -> Regex raise BsonError
+pub fn Document::require_string(Self, String) -> String raise BsonError
+pub fn Document::require_timestamp(Self, String) -> Timestamp raise BsonError
+pub fn Document::require_uuid(Self, String) -> Uuid raise BsonError
+pub fn Document::set(Self, String, Bson) -> Self
+pub fn Document::to_array(Self) -> Array[(String, Bson)]
+pub fn Document::to_bytes(Self) -> Bytes raise BsonError
+pub fn Document::to_extended_json(Self) -> Json raise BsonError
+pub fn Document::to_extended_json_string(Self, indent? : Int) -> String raise BsonError
+pub fn Document::to_relaxed_extended_json(Self) -> Json raise BsonError
+pub fn Document::to_relaxed_extended_json_string(Self, indent? : Int) -> String raise BsonError
+pub fn Document::write_to(Self, @buffer.Buffer) -> Unit raise BsonError
+pub impl FromBson for Document
+pub impl ToBson for Document
+
+pub struct EncodeOptions {
+  max_depth : Int
+  max_size : Int
+} derive(Eq, @debug.Debug)
+pub fn EncodeOptions::max_depth(Self) -> Int
+pub fn EncodeOptions::max_size(Self) -> Int
+pub fn EncodeOptions::new(max_depth? : Int, max_size? : Int) -> Self
+
+pub struct JavaScriptWithScope {
+  code : String
+  scope : Document
+} derive(Eq, @debug.Debug)
+pub fn JavaScriptWithScope::code(Self) -> String
+pub fn JavaScriptWithScope::new(String, Document) -> Self
+pub fn JavaScriptWithScope::scope(Self) -> Document
+
+pub struct ObjectId {
+  bytes : Bytes
+} derive(Eq, @debug.Debug)
+pub fn ObjectId::bytes(Self) -> Bytes
+pub fn ObjectId::from_bytes(Bytes) -> Self raise BsonError
+pub fn ObjectId::from_hex(String) -> Self raise BsonError
+pub fn ObjectId::from_parts(UInt, Bytes, UInt) -> Self raise BsonError
+pub fn ObjectId::new() -> Self
+pub fn ObjectId::timestamp(Self) -> DateTime
+pub fn ObjectId::to_hex(Self) -> String
+pub impl FromBson for ObjectId
+pub impl ToBson for ObjectId
+
+pub struct RawDocument {
+  bytes : Bytes
+} derive(Eq, @debug.Debug)
+pub fn RawDocument::bytes(Self) -> Bytes
+pub fn RawDocument::elements(Self) -> Array[RawElement] raise BsonError
+pub fn RawDocument::from_bytes(Bytes) -> Self raise BsonError
+pub fn RawDocument::from_prefix(BytesView) -> (Self, Int) raise BsonError
+pub fn RawDocument::get_element(Self, String) -> RawElement? raise BsonError
+pub fn RawDocument::to_document(Self) -> Document raise BsonError
+pub fn RawDocument::view(Self) -> BytesView
+
+pub struct RawElement {
+  document : RawDocument
+  key : String
+  type_code : Byte
+  value_start : Int
+  value_end : Int
+} derive(Eq, @debug.Debug)
+pub fn RawElement::key(Self) -> String
+pub fn RawElement::raw_bytes(Self) -> BytesView
+pub fn RawElement::to_bson(Self) -> Bson raise BsonError
+pub fn RawElement::type_code(Self) -> Byte
+
+pub struct Regex {
+  pattern : String
+  options : String
+} derive(Eq, @debug.Debug)
+pub fn Regex::new(String, String) -> Self
+pub fn Regex::options(Self) -> String
+pub fn Regex::pattern(Self) -> String
+
+pub struct Timestamp {
+  time : UInt
+  increment : UInt
+} derive(Eq, @debug.Debug)
+pub fn Timestamp::increment(Self) -> UInt
+pub fn Timestamp::new(UInt, UInt) -> Self
+pub fn Timestamp::time(Self) -> UInt
+
+pub struct Uuid {
+  bytes : Bytes
+} derive(Eq, @debug.Debug)
+pub fn Uuid::bytes(Self) -> Bytes
+pub fn Uuid::from_binary(Binary) -> Self raise BsonError
+pub fn Uuid::from_bytes(Bytes) -> Self raise BsonError
+pub fn Uuid::from_string(String) -> Self raise BsonError
+pub fn Uuid::to_binary(Self) -> Binary
+pub fn Uuid::to_string(Self) -> String
+pub impl FromBson for Uuid
+pub impl ToBson for Uuid
+
+// Type aliases
+
+// Traits
+pub(open) trait FromBson {
+  fn from_bson(Bson) -> Self raise BsonError
+}
+pub impl FromBson for Bool
+pub impl FromBson for Int
+pub impl FromBson for Int64
+pub impl FromBson for Double
+pub impl FromBson for String
+pub impl[T : FromBson] FromBson for T?
+pub impl FromBson for Bytes
+pub impl[T : FromBson] FromBson for Array[T]
+pub impl[T : FromBson] FromBson for Map[String, T]
+
+pub(open) trait ToBson {
+  fn to_bson(Self) -> Bson raise BsonError
+}
+pub impl ToBson for Bool
+pub impl ToBson for Int
+pub impl ToBson for Int64
+pub impl ToBson for Double
+pub impl ToBson for String
+pub impl[T : ToBson] ToBson for T?
+pub impl ToBson for Bytes
+pub impl[T : ToBson] ToBson for Array[T]
+pub impl[T : ToBson] ToBson for Map[String, T]
+

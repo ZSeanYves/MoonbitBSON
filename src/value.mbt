@@ -1,317 +1,621 @@
-///| BSON Type enumeration
-pub enum BsonValue {
-  Double(Float) // 0x01
-  String(String) // 0x02
-  Document(Map[String, BsonValue]) // 0x03
-  Array(Array[BsonValue]) // 0x04
-  Boolean(Bool) // 0x08
-  Null // 0x0A
-  Int32(Int) // 0x10
-  Int64(Int) // 0x12
-}
-
-//
-// ==== Constructor functions ====
-//
+///|
+/// BSON binary subtypes, including the subtypes added by BSON 1.1.
+pub(all) enum BinarySubtype {
+  Generic
+  Function
+  BinaryOld
+  UuidOld
+  Uuid
+  Md5
+  Encrypted
+  Column
+  Sensitive
+  Vector
+  Reserved(Byte)
+  UserDefined(Byte)
+} derive(Eq, Debug)
 
 ///|
-pub fn bson_double(f : Float) -> BsonValue {
-  Double(f)
-}
-
-///|
-pub fn bson_string(s : String) -> BsonValue {
-  String(s)
-}
-
-///|
-pub fn bson_int32(i : Int) -> BsonValue {
-  Int32(i)
-}
-
-///|
-pub fn bson_int64(i : Int) -> BsonValue {
-  Int64(i)
-}
-
-///|
-pub fn bson_bool(b : Bool) -> BsonValue {
-  Boolean(b)
+pub fn BinarySubtype::from_byte(value : Byte) -> BinarySubtype {
+  match value {
+    0x00 => Generic
+    0x01 => Function
+    0x02 => BinaryOld
+    0x03 => UuidOld
+    0x04 => Uuid
+    0x05 => Md5
+    0x06 => Encrypted
+    0x07 => Column
+    0x08 => Sensitive
+    0x09 => Vector
+    0x80..=0xFF => UserDefined(value)
+    _ => Reserved(value)
+  }
 }
 
 ///|
-pub fn bson_null() -> BsonValue {
+pub fn BinarySubtype::to_byte(self : BinarySubtype) -> Byte {
+  match self {
+    Generic => 0x00
+    Function => 0x01
+    BinaryOld => 0x02
+    UuidOld => 0x03
+    Uuid => 0x04
+    Md5 => 0x05
+    Encrypted => 0x06
+    Column => 0x07
+    Sensitive => 0x08
+    Vector => 0x09
+    Reserved(value) | UserDefined(value) => value
+  }
+}
+
+///|
+pub struct Binary {
+  subtype : BinarySubtype
+  bytes : Bytes
+} derive(Eq, Debug)
+
+///|
+pub fn Binary::new(subtype : BinarySubtype, bytes : Bytes) -> Binary {
+  { subtype, bytes }
+}
+
+///|
+pub fn Binary::subtype(self : Binary) -> BinarySubtype {
+  self.subtype
+}
+
+///|
+pub fn Binary::bytes(self : Binary) -> Bytes {
+  self.bytes
+}
+
+///|
+/// A 12-byte BSON ObjectId.
+pub struct ObjectId {
+  bytes : Bytes
+} derive(Eq, Debug)
+
+///|
+pub fn ObjectId::from_bytes(bytes : Bytes) -> ObjectId raise BsonError {
+  if bytes.length() != 12 {
+    raise bson_error(
+      InvalidObjectId,
+      -1,
+      "$",
+      "ObjectId must contain exactly 12 bytes",
+    )
+  }
+  { bytes, }
+}
+
+///|
+fn ObjectId::from_valid_bytes(bytes : Bytes) -> ObjectId {
+  { bytes, }
+}
+
+///|
+pub fn ObjectId::bytes(self : ObjectId) -> Bytes {
+  self.bytes
+}
+
+///|
+pub fn ObjectId::to_hex(self : ObjectId) -> String {
+  let builder = StringBuilder()
+  for byte in self.bytes {
+    builder.write_string(byte.to_hex())
+  }
+  builder.to_string()
+}
+
+///|
+pub fn ObjectId::from_hex(value : String) -> ObjectId raise BsonError {
+  if value.length() != 24 {
+    raise bson_error(
+      InvalidObjectId,
+      -1,
+      "$",
+      "ObjectId hexadecimal text must contain 24 characters",
+    )
+  }
+  let bytes : Array[Byte] = []
+  for index in 0..<12 {
+    let high = hex_nibble(value[index * 2])
+    let low = hex_nibble(value[index * 2 + 1])
+    match (high, low) {
+      (Some(high), Some(low)) => bytes.push((high * 16 + low).to_byte())
+      _ =>
+        raise bson_error(
+          InvalidObjectId,
+          -1,
+          "$",
+          "ObjectId contains a non-hexadecimal character",
+        )
+    }
+  }
+  ObjectId::from_valid_bytes(Bytes::from_array(bytes))
+}
+
+///|
+fn hex_nibble(value : UInt16) -> Int? {
+  match value {
+    '0'..='9' => Some(value.to_int() - 48)
+    'a'..='f' => Some(value.to_int() - 87)
+    'A'..='F' => Some(value.to_int() - 55)
+    _ => None
+  }
+}
+
+///|
+pub struct Regex {
+  pattern : String
+  options : String
+} derive(Eq, Debug)
+
+///|
+pub fn Regex::new(pattern : String, options : String) -> Regex {
+  { pattern, options }
+}
+
+///|
+pub fn Regex::pattern(self : Regex) -> String {
+  self.pattern
+}
+
+///|
+pub fn Regex::options(self : Regex) -> String {
+  self.options
+}
+
+///|
+/// BSON timestamps store an increment followed by seconds since the epoch.
+pub struct Timestamp {
+  time : UInt
+  increment : UInt
+} derive(Eq, Debug)
+
+///|
+pub fn Timestamp::new(time : UInt, increment : UInt) -> Timestamp {
+  { time, increment }
+}
+
+///|
+pub fn Timestamp::time(self : Timestamp) -> UInt {
+  self.time
+}
+
+///|
+pub fn Timestamp::increment(self : Timestamp) -> UInt {
+  self.increment
+}
+
+///|
+/// Decimal128 is kept in its canonical 16-byte IEEE 754-2008 representation.
+pub struct Decimal128 {
+  bytes : Bytes
+} derive(Eq, Debug)
+
+///|
+pub fn Decimal128::from_bytes(bytes : Bytes) -> Decimal128 raise BsonError {
+  if bytes.length() != 16 {
+    raise bson_error(
+      InvalidDecimal128,
+      -1,
+      "$",
+      "Decimal128 must contain exactly 16 bytes",
+    )
+  }
+  { bytes, }
+}
+
+///|
+fn Decimal128::from_valid_bytes(bytes : Bytes) -> Decimal128 {
+  { bytes, }
+}
+
+///|
+pub fn Decimal128::bytes(self : Decimal128) -> Bytes {
+  self.bytes
+}
+
+///|
+/// Parse an exact IEEE 754 Decimal128 string.
+pub fn Decimal128::from_string(value : String) -> Decimal128 raise BsonError {
+  parse_decimal128(value)
+}
+
+///|
+/// Format this Decimal128 using MongoDB's canonical text representation.
+pub fn Decimal128::to_string(self : Decimal128) -> String {
+  format_decimal128(self)
+}
+
+///|
+pub struct DbPointer {
+  collection : String
+  id : ObjectId
+} derive(Eq, Debug)
+
+///|
+pub fn DbPointer::new(collection : String, id : ObjectId) -> DbPointer {
+  { collection, id }
+}
+
+///|
+pub fn DbPointer::collection(self : DbPointer) -> String {
+  self.collection
+}
+
+///|
+pub fn DbPointer::id(self : DbPointer) -> ObjectId {
+  self.id
+}
+
+///|
+pub struct JavaScriptWithScope {
+  code : String
+  scope : Document
+} derive(Eq, Debug)
+
+///|
+pub fn JavaScriptWithScope::new(
+  code : String,
+  scope : Document,
+) -> JavaScriptWithScope {
+  { code, scope }
+}
+
+///|
+pub fn JavaScriptWithScope::code(self : JavaScriptWithScope) -> String {
+  self.code
+}
+
+///|
+pub fn JavaScriptWithScope::scope(self : JavaScriptWithScope) -> Document {
+  self.scope
+}
+
+///|
+/// An insertion-ordered, owned BSON document.
+pub struct Document {
+  values : Map[String, Bson]
+} derive(Eq, Debug)
+
+///|
+pub fn Document::new() -> Document {
+  { values: Map([], capacity=8) }
+}
+
+///|
+pub fn Document::from_array(values : Array[(String, Bson)]) -> Document {
+  { values: Map(values) }
+}
+
+///|
+pub fn Document::set(self : Document, key : String, value : Bson) -> Document {
+  self.values.set(key, value)
+  self
+}
+
+///|
+pub fn Document::remove(self : Document, key : String) -> Unit {
+  self.values.remove(key)
+}
+
+///|
+pub fn Document::get(self : Document, key : String) -> Bson? {
+  self.values.get(key)
+}
+
+///|
+pub fn Document::contains(self : Document, key : String) -> Bool {
+  self.values.contains(key)
+}
+
+///|
+pub fn Document::length(self : Document) -> Int {
+  self.values.length()
+}
+
+///|
+pub fn Document::is_empty(self : Document) -> Bool {
+  self.values.is_empty()
+}
+
+///|
+pub fn Document::to_array(self : Document) -> Array[(String, Bson)] {
+  self.values.to_array()
+}
+
+///|
+pub fn Document::entries(self : Document) -> Array[(String, Bson)] {
+  self.values.to_array()
+}
+
+///|
+pub fn Document::require(self : Document, key : String) -> Bson raise BsonError {
+  match self.get(key) {
+    Some(value) => value
+    None =>
+      raise bson_error(
+        TypeMismatch,
+        -1,
+        field_path("$", key),
+        "required BSON field is missing",
+      )
+  }
+}
+
+///|
+pub fn Document::get_string(self : Document, key : String) -> String? {
+  match self.get(key) {
+    Some(value) => value.as_string()
+    None => None
+  }
+}
+
+///|
+pub fn Document::get_document(self : Document, key : String) -> Document? {
+  match self.get(key) {
+    Some(value) => value.as_document()
+    None => None
+  }
+}
+
+///|
+pub fn Document::get_array(self : Document, key : String) -> Array[Bson]? {
+  match self.get(key) {
+    Some(value) => value.as_array()
+    None => None
+  }
+}
+
+///|
+pub fn Document::get_int32(self : Document, key : String) -> Int? {
+  match self.get(key) {
+    Some(value) => value.as_int32()
+    None => None
+  }
+}
+
+///|
+pub fn Document::get_int64(self : Document, key : String) -> Int64? {
+  match self.get(key) {
+    Some(value) => value.as_int64()
+    None => None
+  }
+}
+
+///|
+pub fn Document::get_double(self : Document, key : String) -> Double? {
+  match self.get(key) {
+    Some(value) => value.as_double()
+    None => None
+  }
+}
+
+///|
+pub fn Document::get_bool(self : Document, key : String) -> Bool? {
+  match self.get(key) {
+    Some(value) => value.as_bool()
+    None => None
+  }
+}
+
+///|
+pub fn Document::require_string(
+  self : Document,
+  key : String,
+) -> String raise BsonError {
+  match self.get_string(key) {
+    Some(value) => value
+    None => raise_type_mismatch(key, "string")
+  }
+}
+
+///|
+pub fn Document::require_document(
+  self : Document,
+  key : String,
+) -> Document raise BsonError {
+  match self.get_document(key) {
+    Some(value) => value
+    None => raise_type_mismatch(key, "document")
+  }
+}
+
+///|
+pub fn Document::require_array(
+  self : Document,
+  key : String,
+) -> Array[Bson] raise BsonError {
+  match self.get_array(key) {
+    Some(value) => value
+    None => raise_type_mismatch(key, "array")
+  }
+}
+
+///|
+pub fn Document::require_int32(
+  self : Document,
+  key : String,
+) -> Int raise BsonError {
+  match self.get_int32(key) {
+    Some(value) => value
+    None => raise_type_mismatch(key, "int32")
+  }
+}
+
+///|
+pub fn Document::require_int64(
+  self : Document,
+  key : String,
+) -> Int64 raise BsonError {
+  match self.get_int64(key) {
+    Some(value) => value
+    None => raise_type_mismatch(key, "int64")
+  }
+}
+
+///|
+pub fn Document::require_double(
+  self : Document,
+  key : String,
+) -> Double raise BsonError {
+  match self.get_double(key) {
+    Some(value) => value
+    None => raise_type_mismatch(key, "double")
+  }
+}
+
+///|
+pub fn Document::require_bool(
+  self : Document,
+  key : String,
+) -> Bool raise BsonError {
+  match self.get_bool(key) {
+    Some(value) => value
+    None => raise_type_mismatch(key, "boolean")
+  }
+}
+
+///|
+fn[T] raise_type_mismatch(key : String, expected : String) -> T raise BsonError {
+  raise bson_error(
+    TypeMismatch,
+    -1,
+    field_path("$", key),
+    "required field is missing or is not " + expected,
+  )
+}
+
+///|
+/// Complete BSON 1.1 value model, including deprecated wire types for decoding.
+pub(all) enum Bson {
+  Double(Double)
+  String(String)
+  Document(Document)
+  Array(Array[Bson])
+  Binary(Binary)
+  Undefined
+  ObjectId(ObjectId)
+  Boolean(Bool)
+  DateTime(DateTime)
   Null
-}
+  Regex(Regex)
+  DbPointer(DbPointer)
+  JavaScript(String)
+  Symbol(String)
+  JavaScriptWithScope(JavaScriptWithScope)
+  Int32(Int)
+  Timestamp(Timestamp)
+  Int64(Int64)
+  Decimal128(Decimal128)
+  MinKey
+  MaxKey
+} derive(Eq, Debug)
 
 ///|
-pub fn bson_document() -> BsonValue {
-  Document(Map::new(capacity=8))
-}
-
-///|
-pub fn bson_array() -> BsonValue {
-  Array([])
-}
-
-//
-// ==== Type judgment ====
-//
-
-///|
-pub fn is_string(self : BsonValue) -> Bool {
+pub fn Bson::as_string(self : Bson) -> String? {
   match self {
-    String(_) => true
-    _ => false
-  }
-}
-
-///|
-pub fn is_int(self : BsonValue) -> Bool {
-  match self {
-    Int32(_) | Int64(_) => true
-    _ => false
-  }
-}
-
-///|
-pub fn is_document(self : BsonValue) -> Bool {
-  match self {
-    Document(_) => true
-    _ => false
-  }
-}
-
-///|
-pub fn is_array(self : BsonValue) -> Bool {
-  match self {
-    Array(_) => true
-    _ => false
-  }
-}
-
-//
-// ==== Type Extraction ====
-//
-
-///|
-pub fn as_string(self : BsonValue) -> String? {
-  match self {
-    String(s) => Some(s)
+    String(value) => Some(value)
     _ => None
   }
 }
 
 ///|
-pub fn as_int32(self : BsonValue) -> Int? {
+pub fn Bson::as_document(self : Bson) -> Document? {
   match self {
-    Int32(i) => Some(i)
+    Document(value) => Some(value)
     _ => None
   }
 }
 
 ///|
-pub fn as_int64(self : BsonValue) -> Int? {
+pub fn Bson::as_array(self : Bson) -> Array[Bson]? {
   match self {
-    Int64(i) => Some(i)
+    Array(value) => Some(value)
     _ => None
   }
 }
 
 ///|
-pub fn as_document(self : BsonValue) -> Map[String, BsonValue]? {
+pub fn Bson::as_int32(self : Bson) -> Int? {
   match self {
-    Document(m) => Some(m)
+    Int32(value) => Some(value)
     _ => None
   }
 }
 
 ///|
-pub fn as_array(self : BsonValue) -> Array[BsonValue]? {
+pub fn Bson::as_int64(self : Bson) -> Int64? {
   match self {
-    Array(arr) => Some(arr)
+    Int64(value) => Some(value)
     _ => None
   }
 }
 
-//
-// ==== Chain construction ====
-//
-
-///| If it is a Document, set the field value (chain writing)
-pub fn set(self : BsonValue, key : String, val : BsonValue) -> BsonValue {
+///|
+pub fn Bson::as_double(self : Bson) -> Double? {
   match self {
-    Document(m) => {
-      m.set(key, val)
-      Document(m)
-    }
-    _ => self
+    Double(value) => Some(value)
+    _ => None
   }
 }
 
-///| If it is Array, add elements (chain writing)
-pub fn push(self : BsonValue, val : BsonValue) -> BsonValue {
+///|
+pub fn Bson::as_bool(self : Bson) -> Bool? {
   match self {
-    Array(arr) => {
-      arr.push(val)
-      Array(arr)
-    }
-    _ => self
+    Boolean(value) => Some(value)
+    _ => None
   }
 }
 
-//
-// ==== Print debugging ====
-//
-
 ///|
-impl Show for BsonValue with to_string(self : BsonValue) -> String {
+pub fn Bson::type_name(self : Bson) -> String {
   match self {
-    Double(f) => "Double(" + f.to_string() + ")"
-    String(s) => "String(" + s + ")"
-    Document(_) => "Document{...}"
-    Array(_) => "Array[...]"
-    Boolean(b) => "Boolean(" + b.to_string() + ")"
-    Null => "Null"
-    Int32(i) => "Int32(" + i.to_string() + ")"
-    Int64(i) => "Int64(" + i.to_string() + ")"
+    Double(_) => "double"
+    String(_) => "string"
+    Document(_) => "document"
+    Array(_) => "array"
+    Binary(_) => "binary"
+    Undefined => "undefined"
+    ObjectId(_) => "objectId"
+    Boolean(_) => "boolean"
+    DateTime(_) => "dateTime"
+    Null => "null"
+    Regex(_) => "regex"
+    DbPointer(_) => "dbPointer"
+    JavaScript(_) => "javascript"
+    Symbol(_) => "symbol"
+    JavaScriptWithScope(_) => "javascriptWithScope"
+    Int32(_) => "int32"
+    Timestamp(_) => "timestamp"
+    Int64(_) => "int64"
+    Decimal128(_) => "decimal128"
+    MinKey => "minKey"
+    MaxKey => "maxKey"
   }
 }
 
 ///|
-impl Eq for BsonValue with op_equal(self, other) {
-  match (self, other) {
-    (Double(f1), Double(f2)) => f1 == f2
-    (String(s1), String(s2)) => s1 == s2
-    (Boolean(b1), Boolean(b2)) => b1 == b2
-    (Null, Null) => true
-    (Int32(i1), Int32(i2)) => i1 == i2
-    (Int64(i1), Int64(i2)) => i1 == i2
-    (Document(m1), Document(m2)) => m1 == m2
-    (Array(a1), Array(a2)) => a1 == a2
-    _ => false
-  }
+/// Validated owned raw BSON. It preserves field order, duplicate keys, and bytes.
+pub struct RawDocument {
+  bytes : Bytes
+} derive(Eq, Debug)
+
+///|
+fn RawDocument::from_valid_bytes(bytes : Bytes) -> RawDocument {
+  { bytes, }
 }
 
 ///|
-impl Show for BsonValue with output(self, logger) {
-  match self {
-    Double(f) => logger.write_object("Double(" + f.to_string() + ")")
-    String(s) => logger.write_object("String(" + s + ")")
-    Boolean(b) => logger.write_object("Boolean(" + b.to_string() + ")")
-    Null => logger.write_object("Null")
-    Int32(i) => logger.write_object("Int32(" + i.to_string() + ")")
-    Int64(i) => logger.write_object("Int64(" + i.to_string() + ")")
-    Document(m) => {
-      let parts = m
-        .keys()
-        .map(fn(k) {
-          let v = m.get(k).unwrap_or(Null)
-          "\"" + k + "\": " + Show::to_string(v)
-        })
-      logger.write_object("Document{" + parts.join(", ") + "}")
-    }
-    Array(arr) => {
-      let strs = arr.map(Show::to_string)
-      logger.write_object("Array[" + strs.join(", ") + "]")
-    }
-  }
+pub fn RawDocument::bytes(self : RawDocument) -> Bytes {
+  self.bytes
 }
 
 ///|
-test "Basic Document Encode/Decode" {
-  let doc = bson_document()
-    .set("name", bson_string("Alice"))
-    .set("age", bson_int32(30))
-    .set("vip", bson_bool(true))
-  let bin = encode_bson(doc)
-  let result = decode_bson(bin)
-  assert_eq(result, doc)
-}
-
-///|
-test "Nested Document" {
-  let inner = bson_document().set("city", bson_string("Shanghai"))
-  let doc = bson_document().set("user", inner)
-  let bin = encode_bson(doc)
-  let result = decode_bson(bin)
-  assert_eq(result, doc)
-}
-
-///|
-test "Array Encode/Decode" {
-  let arr = bson_array().push(bson_string("A")).push(bson_int64(1234567890))
-  let doc = bson_document().set("list", arr)
-  let bin = encode_bson(doc)
-  let result = decode_bson(bin)
-  assert_eq(result, doc)
-}
-
-///|
-test "Empty Document Roundtrip" {
-  let doc = bson_document()
-  let bin = encode_bson(doc)
-  let result = decode_bson(bin)
-  assert_eq(result, doc)
-}
-
-///|
-test "check decode_cstring result" {
-  let raw : Array[Byte] = [0x6E, 0x61, 0x6D, 0x65, 0x00] // "name"
-  let reader = @buffer.new_reader(Bytes::from_array(raw))
-  let result = decode_cstring(reader)
-  println(result)
-  assert_eq(result, "name")
-}
-
-test "Basic Types Roundtrip" {
-  let doc = bson_document()
-    .set("str", bson_string("hello"))
-    .set("i32", bson_int32(123))
-    .set("fake_i64", bson_string("9876543210123456789")) // Int64 as string
-    .set("bool", bson_bool(true))
-    .set("null", bson_null())
-
-  let bin = encode_bson(doc)
-  let result = decode_bson(bin)
-  assert_eq(result, doc)
-}
-
-test "Deeply Nested Document" {
-  let inner = bson_document().set("level3", bson_string("deep"))
-  let mid = bson_document().set("level2", inner)
-  let outer = bson_document().set("level1", mid)
-
-  let bin = encode_bson(outer)
-  let result = decode_bson(bin)
-  assert_eq(result, outer)
-}
-
-test "Empty Array Encode/Decode" {
-  let arr = bson_array() // 空数组
-  let doc = bson_document().set("emptyList", arr)
-
-  let bin = encode_bson(doc)
-  let result = decode_bson(bin)
-  assert_eq(result, doc)
-}
-
-test "Array of Mixed Types" {
-  let inner = bson_document().set("id", bson_int32(1))
-  let arr = bson_array()
-    .push(bson_string("item"))
-    .push(bson_int64(123456))
-    .push(inner)
-
-  let doc = bson_document().set("mixed", arr)
-
-  let bin = encode_bson(doc)
-  let result = decode_bson(bin)
-  assert_eq(result, doc)
-}
-
-test "BufferWriter Overflow" {
-  let writer = @buffer.new_writer(4)
-  let result = try? writer.write_all([0x01, 0x02, 0x03, 0x04, 0x05]) // 长度 5 > 容量 4
-  assert_eq(result.is_err(), true)
+pub fn RawDocument::view(self : RawDocument) -> BytesView {
+  self.bytes[:]
 }

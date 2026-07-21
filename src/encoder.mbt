@@ -1,122 +1,344 @@
-///| Encode a complete BsonValue document
-pub fn encode_bson(doc : BsonValue) -> Bytes raise Error {
-  match doc {
-    Document(map) => encode_document(map)
-    _ =>
-      raise BsonError::InvalidDocumentLength("Top-level value must be Document")
-  }
+///|
+/// Encode an owned BSON document using the default safety limits.
+pub fn encode(document : Document) -> Bytes raise BsonError {
+  encode_with_options(document, EncodeOptions::new())
 }
 
-///| Encode a BSON document from Map
-fn encode_document(map : Map[String, BsonValue]) -> Bytes raise Error {
-  let writer = @buffer.new_writer(128)
-  writer.write_all([0, 0, 0, 0]) // placeholder for length
-  for k in map.keys() {
-    match map.get(k) {
-      Some(v) => {
-        let type_code = get_type_code(v)
-        writer.write_byte(type_code)
-        write_cstring(writer, k)
-        write_element(writer, v)
-      }
-      None =>
-        raise BsonError::InvalidDocumentLength("Missing value in document map")
+///|
+pub fn encode_with_options(
+  document : Document,
+  options : EncodeOptions,
+) -> Bytes raise BsonError {
+  encode_document(document, options, 0, "$")
+}
+
+///|
+pub fn Document::to_bytes(self : Document) -> Bytes raise BsonError {
+  encode(self)
+}
+
+///|
+/// Append this document to an existing official MoonBit Buffer.
+pub fn Document::write_to(
+  self : Document,
+  buffer : @buffer.Buffer,
+) -> Unit raise BsonError {
+  buffer.write_bytes(encode(self))
+}
+
+///|
+pub fn encode_to(
+  document : Document,
+  buffer : @buffer.Buffer,
+) -> Unit raise BsonError {
+  document.write_to(buffer)
+}
+
+///|
+pub fn encode_to_with_options(
+  document : Document,
+  buffer : @buffer.Buffer,
+  options : EncodeOptions,
+) -> Unit raise BsonError {
+  buffer.write_bytes(encode_with_options(document, options))
+}
+
+///|
+fn encode_document(
+  document : Document,
+  options : EncodeOptions,
+  depth : Int,
+  path : String,
+) -> Bytes raise BsonError {
+  if depth > options.max_depth {
+    raise bson_error(
+      DepthLimit,
+      -1,
+      path,
+      "maximum BSON nesting depth exceeded",
+    )
+  }
+  let writer = @buffer.Buffer(size_hint=128)
+  writer.write_int_le(0)
+  for entry in document.to_array() {
+    let (key, value) = entry
+    let value_path = field_path(path, key)
+    let payload = @buffer.Buffer(size_hint=32)
+    let type_code = write_element(payload, value, options, depth, value_path)
+    let element = @buffer.Buffer(size_hint=payload.length() + key.length() + 2)
+    element.write_byte(type_code)
+    write_cstring(element, key, value_path)
+    element.write_bytes(payload.to_bytes())
+    writer.write_bytes(element.to_bytes())
+    if writer.length() + 1 > options.max_size {
+      raise bson_error(SizeLimit, -1, path, "BSON document exceeds max_size")
     }
   }
-  writer.write_byte(0x00) // document end
-  let result = writer.flush()
-  writer.clear()
-  let len = result.length()
-  let len_bytes = encode_i32(len)
-  for i in 0..<4 {
-    result[i] = len_bytes[i]
-  }
-  Bytes::from_array(result)
+  writer.write_byte(0x00)
+  finish_sized_value(writer, options, path)
 }
 
-///| Get BSON type code for a BsonValue
-fn get_type_code(v : BsonValue) -> Byte {
-  match v {
-    Double(_) => 0x01
-    String(_) => 0x02
-    Document(_) => 0x03
-    Array(_) => 0x04
-    Boolean(_) => 0x08
-    Null => 0x0A
-    Int32(_) => 0x10
-    Int64(_) => 0x12
-  }
-}
-
-///| Write a BSON element
+///|
 fn write_element(
-  writer : @buffer.BufferWriter,
-  v : BsonValue,
-) -> Unit raise Error {
-  match v {
-    Double(_) => raise BsonError::UnsupportedType(0x01) // TODO: implement f64 -> byte[8]
-    String(s) => write_string(writer, s)
-    Document(m) => {
-      let bytes = encode_document(m)
-      writer.write_all(bytes.to_array())
+  writer : @buffer.Buffer,
+  value : Bson,
+  options : EncodeOptions,
+  depth : Int,
+  path : String,
+) -> Byte raise BsonError {
+  match value {
+    Double(value) => {
+      writer.write_double_le(value)
+      0x01
     }
-    Array(arr) => write_array(writer, arr)
-    Boolean(b) => writer.write_byte(if b { 1 } else { 0 })
-    Null => () // no content
-    Int32(i) => writer.write_all(encode_i32(i))
-    Int64(i) => writer.write_all(encode_i64(i))
+    String(value) => {
+      write_string(writer, value, options, path)
+      0x02
+    }
+    Document(value) => {
+      writer.write_bytes(encode_document(value, options, depth + 1, path))
+      0x03
+    }
+    Array(value) => {
+      writer.write_bytes(encode_array(value, options, depth + 1, path))
+      0x04
+    }
+    Binary(value) => {
+      write_binary(writer, value, options, path)
+      0x05
+    }
+    Undefined => 0x06
+    ObjectId(value) => {
+      writer.write_bytes(value.bytes())
+      0x07
+    }
+    Boolean(value) => {
+      writer.write_byte(if value { 1 } else { 0 })
+      0x08
+    }
+    DateTime(value) => {
+      writer.write_int64_le(value.to_millis())
+      0x09
+    }
+    Null => 0x0A
+    Regex(value) => {
+      write_regex(writer, value, path)
+      0x0B
+    }
+    DbPointer(value) => {
+      write_string(writer, value.collection(), options, path)
+      writer.write_bytes(value.id().bytes())
+      0x0C
+    }
+    JavaScript(value) => {
+      write_string(writer, value, options, path)
+      0x0D
+    }
+    Symbol(value) => {
+      write_string(writer, value, options, path)
+      0x0E
+    }
+    JavaScriptWithScope(value) => {
+      write_javascript_with_scope(writer, value, options, depth + 1, path)
+      0x0F
+    }
+    Int32(value) => {
+      writer.write_int_le(value)
+      0x10
+    }
+    Timestamp(value) => {
+      writer.write_uint_le(value.increment())
+      writer.write_uint_le(value.time())
+      0x11
+    }
+    Int64(value) => {
+      writer.write_int64_le(value)
+      0x12
+    }
+    Decimal128(value) => {
+      writer.write_bytes(value.bytes())
+      0x13
+    }
+    MinKey => 0xFF
+    MaxKey => 0x7F
   }
 }
 
-///| Write a BSON array (index as string keys)
-fn write_array(
-  writer : @buffer.BufferWriter,
-  arr : Array[BsonValue],
-) -> Unit raise Error {
-  let inner = Map::new(capacity=arr.length())
-  for i in 0..<arr.length() {
-    inner.set(i.to_string(), arr[i])
+///|
+fn encode_array(
+  values : Array[Bson],
+  options : EncodeOptions,
+  depth : Int,
+  path : String,
+) -> Bytes raise BsonError {
+  if depth > options.max_depth {
+    raise bson_error(
+      DepthLimit,
+      -1,
+      path,
+      "maximum BSON nesting depth exceeded",
+    )
   }
-  let bytes = encode_document(inner)
-  writer.write_all(bytes.to_array())
+  let writer = @buffer.Buffer(size_hint=128)
+  writer.write_int_le(0)
+  for index, value in values {
+    let key = index.to_string()
+    let value_path = index_path(path, index)
+    let payload = @buffer.Buffer(size_hint=32)
+    let type_code = write_element(payload, value, options, depth, value_path)
+    writer.write_byte(type_code)
+    write_cstring(writer, key, value_path)
+    writer.write_bytes(payload.to_bytes())
+    if writer.length() + 1 > options.max_size {
+      raise bson_error(SizeLimit, -1, path, "BSON array exceeds max_size")
+    }
+  }
+  writer.write_byte(0x00)
+  finish_sized_value(writer, options, path)
 }
 
-///| Write a CString (null-terminated)
-fn write_cstring(writer : @buffer.BufferWriter, s : String) -> Unit raise Error {
-  let bytes = @buffer.string_to_utf8_bytes(s).to_array()
-  writer.write_all(bytes)
+///|
+fn write_binary(
+  writer : @buffer.Buffer,
+  value : Binary,
+  options : EncodeOptions,
+  path : String,
+) -> Unit raise BsonError {
+  let bytes = value.bytes()
+  let extra = if value.subtype() == BinaryOld { 4 } else { 0 }
+  if bytes.length() > options.max_size - extra {
+    raise bson_error(SizeLimit, -1, path, "BSON binary value exceeds max_size")
+  }
+  writer.write_int_le(bytes.length() + extra)
+  writer.write_byte(value.subtype().to_byte())
+  if value.subtype() == BinaryOld {
+    writer.write_int_le(bytes.length())
+  }
+  writer.write_bytes(bytes)
+}
+
+///|
+fn write_regex(
+  writer : @buffer.Buffer,
+  value : Regex,
+  path : String,
+) -> Unit raise BsonError {
+  if !regex_is_valid(value) {
+    raise bson_error(
+      InvalidRegex,
+      -1,
+      path,
+      "regex pattern/options contain NUL or options are not sorted",
+    )
+  }
+  write_cstring(writer, value.pattern(), path)
+  write_cstring(writer, value.options(), path)
+}
+
+///|
+fn write_javascript_with_scope(
+  writer : @buffer.Buffer,
+  value : JavaScriptWithScope,
+  options : EncodeOptions,
+  depth : Int,
+  path : String,
+) -> Unit raise BsonError {
+  let scoped = @buffer.Buffer(size_hint=64)
+  scoped.write_int_le(0)
+  write_string(scoped, value.code(), options, path)
+  scoped.write_bytes(encode_document(value.scope(), options, depth, path))
+  writer.write_bytes(finish_sized_value(scoped, options, path))
+}
+
+///|
+fn write_cstring(
+  writer : @buffer.Buffer,
+  value : String,
+  path : String,
+) -> Unit raise BsonError {
+  if value.contains_code_unit(0) {
+    raise bson_error(
+      InvalidCString,
+      -1,
+      path,
+      "CString contains a NUL code unit",
+    )
+  }
+  writer.write_bytes(@utf8.encode(value))
   writer.write_byte(0x00)
 }
 
-///| Write a BSON string (length + content + null)
-fn write_string(writer : @buffer.BufferWriter, s : String) -> Unit raise Error {
-  let bytes = @buffer.string_to_utf8_bytes(s).to_array()
-  let len = bytes.length() + 1
-  writer.write_all(encode_i32(len))
-  writer.write_all(bytes)
+///|
+fn write_string(
+  writer : @buffer.Buffer,
+  value : String,
+  options : EncodeOptions,
+  path : String,
+) -> Unit raise BsonError {
+  let bytes = @utf8.encode(value)
+  if bytes.length() >= options.max_size {
+    raise bson_error(SizeLimit, -1, path, "BSON string exceeds max_size")
+  }
+  writer.write_int_le(bytes.length() + 1)
+  writer.write_bytes(bytes)
   writer.write_byte(0x00)
 }
 
-///| Encode Int32 to 4 bytes (little endian)
-fn encode_i32(v : Int) -> Array[Byte] {
-  [
-    (v & 0xFF).to_byte(),
-    ((v >> 8) & 0xFF).to_byte(),
-    ((v >> 16) & 0xFF).to_byte(),
-    ((v >> 24) & 0xFF).to_byte(),
-  ]
+///|
+fn finish_sized_value(
+  writer : @buffer.Buffer,
+  options : EncodeOptions,
+  path : String,
+) -> Bytes raise BsonError {
+  let bytes = writer.to_bytes().to_array()
+  if bytes.length() > options.max_size {
+    raise bson_error(SizeLimit, -1, path, "BSON value exceeds max_size")
+  }
+  let length = bytes.length()
+  bytes[0] = (length & 0xFF).to_byte()
+  bytes[1] = ((length >> 8) & 0xFF).to_byte()
+  bytes[2] = ((length >> 16) & 0xFF).to_byte()
+  bytes[3] = ((length >> 24) & 0xFF).to_byte()
+  Bytes::from_array(bytes)
 }
 
-///| Encode Int64 to 8 bytes (little endian)
-fn encode_i64(v : Int) -> Array[Byte] {
-  [
-    (v & 0xFF).to_byte(),
-    ((v >> 8) & 0xFF).to_byte(),
-    ((v >> 16) & 0xFF).to_byte(),
-    ((v >> 24) & 0xFF).to_byte(),
-    ((v >> 32) & 0xFF).to_byte(),
-    ((v >> 40) & 0xFF).to_byte(),
-    ((v >> 48) & 0xFF).to_byte(),
-    ((v >> 56) & 0xFF).to_byte(),
-  ]
+///|
+fn regex_is_valid(value : Regex) -> Bool {
+  if value.pattern().contains_code_unit(0) ||
+    value.options().contains_code_unit(0) {
+    return false
+  }
+  let mut previous : UInt16 = 0
+  for index, option in value.options().code_units() {
+    let supported = match option {
+      'i' | 'l' | 'm' | 's' | 'u' | 'x' => true
+      _ => false
+    }
+    if !supported || (index > 0 && option <= previous) {
+      return false
+    }
+    previous = option
+  }
+  true
+}
+
+///|
+fn normalize_regex_options(options : String) -> String? {
+  if options.contains_code_unit(0) {
+    return None
+  }
+  let seen : Map[UInt16, Unit] = Map([])
+  for option in options.code_units() {
+    if !(option is ('i' | 'l' | 'm' | 's' | 'u' | 'x')) || seen.contains(option) {
+      return None
+    }
+    seen.set(option, ())
+  }
+  let normalized = StringBuilder()
+  for option in "ilmsux".code_units() {
+    if seen.contains(option) {
+      normalized.write_string(option.to_char().unwrap().to_string())
+    }
+  }
+  Some(normalized.to_string())
 }
