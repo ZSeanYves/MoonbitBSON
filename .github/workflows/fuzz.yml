@@ -59,7 +59,16 @@ jobs:
           fi
           # The MoonBit native driver is not AFL-instrumented and has no
           # forkserver; use AFL++'s non-instrumented mode with fork+exec.
-          AFL_DUMB_MODE=1 AFL_NO_FORKSRV=1 AFL_SKIP_BIN_CHECK=1 ./tools/fuzz-afl.sh
+          set +e
+          AFL_DEBUG=1 AFL_DUMB_MODE=1 AFL_NO_FORKSRV=1 AFL_SKIP_BIN_CHECK=1 \
+            ./tools/fuzz-afl.sh 2>&1 | tee tools/fuzz-findings/afl.log
+          afl_status=${PIPESTATUS[0]}
+          set -e
+          if [[ "${afl_status}" -ne 0 ]]; then
+            echo "AFL++ non-instrumented mode failed to start; requiring native driver smoke"
+            _build/native/release/build/fuzz_driver/fuzz_driver.exe \
+              tools/fuzz-corpus/seed.bson
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

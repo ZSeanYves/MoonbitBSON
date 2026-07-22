@@ -81,7 +81,9 @@
   差分，比较文本输出和重新编码结果。
 - `src/fuzz_driver` 加入 AFL++ 可执行 harness；CI 运行 native driver smoke，长期运行
   由 `tools/fuzz-afl.sh` 启动；`.github/workflows/fuzz.yml` 每日运行 sanitizer 和
-  AFL++，push 事件执行 30 秒烟测并上传 findings artifact。
+  AFL++，push 事件执行 30 秒烟测并上传 findings artifact。若 Ubuntu runner 无法启动
+  AFL++ 非插桩模式，workflow 保留 `afl.log` 并强制执行 native driver seed smoke；driver
+  崩溃仍会使 job 失败。
 
 本机 native release 最近一次测量：编码约 `18.53 us`，完整 Document 解码约 `16.00 us`，
 owned Raw 定点读取约 `6.37 us`，borrowed RawDocumentView 定点读取约 `3.45 us`。
