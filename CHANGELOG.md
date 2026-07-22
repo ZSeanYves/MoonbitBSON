@@ -9,11 +9,28 @@
   user-defined traits cannot be compiler-derived.
 - Borrowed `RawDocumentView`/`RawElementView` APIs and a chunked
   `BsonStreamDecoder` for split BSON frames.
+- `BsonStreamRawDecoder` for split and coalesced frames without per-frame
+  `Document` materialization; returned views retain immutable backing bytes.
 - OS/Web Crypto-backed `ObjectId::new` and `ObjectId::new_secure`; unsupported
   hosts return `UnsupportedEntropy` instead of using a deterministic PRNG.
 - Rust `bson` 3.1.0 Decimal128 random bit-pattern differential oracle.
 - Native AFL++ decoder driver and long-running fuzz command, with CI smoke
   coverage for the driver.
+
+### Compatibility notes
+
+- The current MoonBit compiler (`0.1.20260713` in the release environment)
+  rejects `derive(ToBson)` with `E4077`. The supported serde-like path remains
+  explicit source code generation. See the official [E4077
+  documentation](https://docs.moonbitlang.com/en/latest/language/error_codes/E4077.html)
+  and [attribute documentation](https://docs.moonbitlang.com/en/stable/language/attributes.html).
+
+### Fixed
+
+- `BsonStreamDecoder` now waits for a frame split after its four-byte length
+  header instead of reporting the incomplete body as `InvalidLength`.
+- Stream framing rejects declared lengths above the configured/default 16 MiB
+  limit before retaining the oversized frame body.
 
 ## 0.3.0 - 2026-07-22
 

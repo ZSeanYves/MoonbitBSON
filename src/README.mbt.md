@@ -66,8 +66,8 @@ test "typed and raw APIs" {
 }
 ```
 
-For high-throughput framing, keep the input allocation alive and use the
-borrowed view or stream decoder:
+For a single borrowed frame, keep its input allocation alive and use the raw
+view. For high-throughput framing, use one of the stream decoders:
 
 ```mbt check
 ///|
@@ -86,7 +86,33 @@ test "borrowed view and split stream" {
 payloads, and binary payloads. Values remain borrowed until the caller chooses
 `to_bson`, `to_document`, or `to_array`.
 
+`BsonStreamRawDecoder` is the borrowed counterpart to `BsonStreamDecoder`:
+
+```mbt check
+///|
+test "raw stream view" {
+  let first = Document::new().set("ok", Boolean(true)).to_bytes()
+  let second = Document::new().set("count", Int32(2)).to_bytes()
+  let stream = BsonStreamRawDecoder::new()
+  let views = stream.push(first + second)
+  assert_eq(views.length(), 2)
+  assert_eq(views[0].get("ok").unwrap().to_bson(), Boolean(true))
+  assert_eq(views[1].get("count").unwrap().to_bson(), Int32(2))
+  stream.finish()
+}
+```
+
+Complete frames are sliced from an immutable pending `Bytes` buffer. A frame
+split across chunks is assembled in that buffer; returned views retain their
+backing bytes and remain valid after later `push` calls. This avoids per-frame
+`Document` materialization, but cannot be end-to-end zero-copy when the input
+frame arrives in separate allocations. `BsonStreamRawDecoder::new` defaults to
+a 16 MiB per-frame limit and rejects oversized declared lengths before buffering.
+
 MoonBit cannot derive user-defined traits with the compiler's built-in derive
-system. Use `tools/bson-derive.mjs` for checked-in serde-like implementations;
-the `/// @bson.derive` and `/// @bson.rename("...")` annotations are source-level
-metadata consumed by that generator.
+system. The current compiler reports `E4077` for `derive(ToBson)`, while
+`#custom.*` attributes are intentionally ignored by the compiler and can only
+be consumed by external tools. Use `tools/bson-derive.mjs` for checked-in
+serde-like implementations; the `/// @bson.derive` and
+`/// @bson.rename("...")` annotations are source-level metadata consumed by
+that generator.

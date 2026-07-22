@@ -94,7 +94,9 @@ entropy and fails explicitly when the host cannot provide it.
 types, including arrays, maps, options, and the typed BSON values.
 
 MoonBit does not allow user-defined traits in the compiler's built-in `derive`
-set. For serde-style generated implementations, use the checked-in schema
+set. The current compiler reports `E4077` for `derive(ToBson)`; `#custom.*`
+attributes are metadata for external tools and do not register a compiler
+derive. For serde-style generated implementations, use the checked-in schema
 codegen tool or the annotation-driven struct generator:
 
 ```bash
@@ -110,7 +112,12 @@ The generated output is checked in and can be verified with `--check` in CI.
 `RawDocumentView` and `RawElementView` retain `BytesView` slices and decode
 values only when requested. `RawBsonRef` keeps nested values, string payloads,
 and binary payloads borrowed until `to_bson` is called. `BsonStreamDecoder` and
-`BsonStreamEncoder` handle arbitrarily split and batched frames. `ObjectId::new`
+`BsonStreamRawDecoder` handle arbitrarily split and batched frames; the latter
+returns raw views without materializing `Document` values. A frame split across
+input chunks is assembled in internal pending storage, while returned views
+remain valid after later `push` calls. Its `max_size` argument defaults to 16
+MiB and rejects oversized declared frames before they are buffered.
+`BsonStreamEncoder` appends owned frames. `ObjectId::new`
 uses OS/Web Crypto entropy and raises `UnsupportedEntropy` on hosts without a
 secure source. WASM hosts can install a secure callback with
 `install_secure_entropy_provider`; `src/wasm_entropy` is a small import adapter
@@ -127,6 +134,7 @@ moon test --release --target all --deny-warn --warn-list +73
 moon bench --target native --release
 moon coverage analyze -- -f summary
 node tools/bson-codegen.mjs --check codegen/example.schema.json src/codegen_generated_test.mbt
+node tools/bson-derive.mjs --check src/derive_types_test.mbt src/derive_generated_test.mbt
 node tools/decimal128-differential.mjs
 moon info --target all
 moon package --list

@@ -17,6 +17,11 @@ node tools/bson-derive.mjs src/derive_types_test.mbt src/derive_generated_test.m
 node tools/bson-derive.mjs --check src/derive_types_test.mbt src/derive_generated_test.mbt
 ```
 
+This is external code generation, not a compiler derive. The current compiler
+rejects user-defined `derive(ToBson)` with `E4077`; `#custom.*` attributes are
+ignored by the compiler and are only an input convention for tools such as this
+one.
+
 `decimal128-differential.mjs` compares deterministic random Decimal128
 bit-patterns with Rust `bson` 3.1.0. It requires Node.js and Cargo:
 
