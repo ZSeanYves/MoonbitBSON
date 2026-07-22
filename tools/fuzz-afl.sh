@@ -30,10 +30,10 @@ if [[ "${duration}" == "0" ]]; then
 fi
 
 set +e
-# AFL++ documents SIGINT (Ctrl-C) as the graceful stop signal. Some AFL++
-# builds still return 1 after a timed smoke run, which looks like a crash.
+# Let AFL++ own the timed stop so its child and fuzzer exit codes are not
+# confused by an external timeout wrapper.
 started_at=${SECONDS}
-timeout --signal=INT --kill-after=5s "${duration}s" afl-fuzz "${afl_mode[@]}" \
+afl-fuzz "${afl_mode[@]}" -V "${duration}" \
   -i tools/fuzz-corpus \
   -o tools/fuzz-findings \
   -- "${binary}" @@
