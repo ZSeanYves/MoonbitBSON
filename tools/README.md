@@ -29,7 +29,9 @@ bit-patterns with Rust `bson` 3.1.0. It requires Node.js and Cargo:
 node tools/decimal128-differential.mjs
 ```
 
-The long-running native decoder harness is AFL++-compatible:
+The long-running native decoder harness is AFL++-compatible. CI runs the
+native, non-instrumented driver with AFL++ `-n` mode and `AFL_NO_FORKSRV=1`;
+the script still treats a target crash or unexpected AFL++ exit as a failure:
 
 ```bash
 BSON_FUZZ_DURATION=900 ./tools/fuzz-afl.sh

@@ -57,7 +57,9 @@ jobs:
             echo "clang build failed; retrying with MoonBit's default native compiler"
             moon build --target native --release src/fuzz_driver
           fi
-          AFL_DUMB_MODE=1 ./tools/fuzz-afl.sh
+          # The MoonBit native driver is not AFL-instrumented and has no
+          # forkserver; use AFL++'s non-instrumented mode with fork+exec.
+          AFL_DUMB_MODE=1 AFL_NO_FORKSRV=1 ./tools/fuzz-afl.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
