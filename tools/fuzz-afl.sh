@@ -8,7 +8,7 @@ fi
 
 moon build --target native --release src/fuzz_driver
 
-binary="$(find _build -type f -name 'fuzz_driver' -perm -111 | head -n 1)"
+binary="$(find _build -type f \( -name 'fuzz_driver' -o -name 'fuzz_driver.exe' \) -perm -111 | head -n 1)"
 if [[ -z "${binary}" ]]; then
   echo "MoonBit fuzz driver executable was not found under _build" >&2
   exit 1
