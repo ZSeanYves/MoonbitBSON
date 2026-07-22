@@ -37,7 +37,10 @@
 - `moon.mod` 版本为 `0.3.0`，双语 README、CHANGELOG、包元数据和 CI 已更新。
 - CI 使用现代 `moon.mod`/`moon.pkg`，执行 fmt、全目标 check/test、release test、
   native benchmark、coverage summary、info 和 package listing。
-- 当前工具链也可直接执行 `moon doc`；仓库不保留已经废弃的 `moon.mod.json` 兼容清单。
+- 当前工具链的 `moon doc --dry-run` 可正确解析现代 `moon.mod`/`moon.pkg`；完整
+  `moon doc` 仍会因文档命令以 wasm-gc 检查 native-only `src/fuzz_driver` 的
+  `extern "C"` 而报 `E4156`。这与已经废弃的 `moon.mod.json` 无关，因此暂不把
+  `moon doc` 纳入 CI 门禁，待上游支持按 package target 生成文档后再恢复。
 - 不执行 `moon publish`，不创建 tag；本轮只推送提交并等待远端 CI 通过。
 
 ## 阶段 4：类型化与可组合 API
