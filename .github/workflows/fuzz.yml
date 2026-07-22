@@ -52,7 +52,11 @@ jobs:
       - name: Build and run AFL++ harness
         run: |
           chmod +x tools/fuzz-afl.sh
-          MOON_CC=clang moon build --target native --release src/fuzz_driver
+          mkdir -p tools/fuzz-findings
+          if ! MOON_CC=clang moon build --target native --release src/fuzz_driver; then
+            echo "clang build failed; retrying with MoonBit's default native compiler"
+            moon build --target native --release src/fuzz_driver
+          fi
           AFL_QEMU_MODE=1 ./tools/fuzz-afl.sh
       - uses: actions/upload-artifact@v4
         if: always()
