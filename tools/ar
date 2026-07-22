@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# MoonBit resolves the archive tool beside a custom MOON_CC executable.
+exec ar "$@"

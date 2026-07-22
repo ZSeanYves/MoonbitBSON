@@ -1,0 +1,63 @@
+name: Nightly Fuzz And Sanitizers
+
+on:
+  push:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  sanitizer:
+    runs-on: ubuntu-latest
+    env:
+      ASAN_OPTIONS: detect_leaks=0:halt_on_error=1:abort_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-moonbit@v1
+      - run: chmod +x tools/clang-sanitize.sh
+      - name: Native sanitizer test suite
+        run: |
+          mkdir -p tools/sanitizer-findings
+          MOON_CC="$PWD/tools/clang-sanitize.sh" moon test --target native --release \
+            --deny-warn --warn-list +73 2>&1 | tee tools/sanitizer-findings/moon-test.log
+      - name: Sanitized fuzz driver smoke
+        run: |
+          MOON_CC="$PWD/tools/clang-sanitize.sh" moon build --target native --release src/fuzz_driver
+          _build/native/release/build/fuzz_driver/fuzz_driver.exe \
+            tools/fuzz-corpus/seed.bson 2>&1 | tee tools/sanitizer-findings/fuzz-driver.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sanitizer-findings
+          path: tools/sanitizer-findings
+          retention-days: 14
+
+  afl:
+    runs-on: ubuntu-latest
+    env:
+      AFL_SKIP_CPUFREQ: "1"
+      AFL_NO_AFFINITY: "1"
+      BSON_FUZZ_DURATION: ${{ github.event_name == 'push' && '30' || '900' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-moonbit@v1
+      - name: Install AFL++
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y afl++
+      - name: Build and run AFL++ harness
+        run: |
+          chmod +x tools/fuzz-afl.sh
+          MOON_CC=afl-clang-fast moon build --target native --release src/fuzz_driver
+          ./tools/fuzz-afl.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: afl-findings
+          path: tools/fuzz-findings
+          if-no-files-found: warn
+          retention-days: 14

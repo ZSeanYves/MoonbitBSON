@@ -85,16 +85,24 @@ OS/Web Crypto 安全熵，宿主无法提供时会明确失败。
 `ToBson` 和 `FromBson` 提供可选的泛型转换，支持数组、Map、Option 以及类型化 BSON 值。
 
 MoonBit 不允许把用户自定义 trait 放进编译器内置 `derive` 集合。需要类似 serde 的
-生成实现时，使用仓库内可检查的 schema codegen 工具：
+生成实现时，可以使用 schema codegen，也可以使用注释驱动的结构体生成器：
 
 ```bash
 node tools/bson-codegen.mjs codegen/example.schema.json src/codegen_generated_test.mbt
 ```
 
+```bash
+node tools/bson-derive.mjs src/derive_types_test.mbt src/derive_generated_test.mbt
+```
+
+生成文件会提交到仓库，并由 CI 使用 `--check` 检查是否漂移。
+
 `RawDocumentView` 和 `RawElementView` 保留 `BytesView` 切片，只在显式请求时解码值。
+`RawBsonRef` 让嵌套值、字符串 payload 和 binary payload 在调用 `to_bson` 前保持借用。
 `BsonStreamDecoder` 和 `BsonStreamEncoder` 支持任意边界拆分和批量 frame。
 `ObjectId::new` 使用 OS/Web Crypto 安全熵；没有安全熵的宿主会返回
-`UnsupportedEntropy`。
+`UnsupportedEntropy`。WASM 宿主可以通过 `install_secure_entropy_provider` 注入安全回调，
+`src/wasm_entropy` 提供 `moonbit:bson` 模块中 `secure_random_u32` 函数的 import 适配器。
 
 ## 开发与验证
 

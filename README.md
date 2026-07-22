@@ -95,16 +95,27 @@ types, including arrays, maps, options, and the typed BSON values.
 
 MoonBit does not allow user-defined traits in the compiler's built-in `derive`
 set. For serde-style generated implementations, use the checked-in schema
-codegen tool:
+codegen tool or the annotation-driven struct generator:
 
 ```bash
 node tools/bson-codegen.mjs codegen/example.schema.json src/codegen_generated_test.mbt
 ```
 
+```bash
+node tools/bson-derive.mjs src/derive_types_test.mbt src/derive_generated_test.mbt
+```
+
+The generated output is checked in and can be verified with `--check` in CI.
+
 `RawDocumentView` and `RawElementView` retain `BytesView` slices and decode
-values only when requested. `BsonStreamDecoder` and `BsonStreamEncoder` handle
-arbitrarily split and batched frames. `ObjectId::new` uses OS/Web Crypto entropy and raises
-`UnsupportedEntropy` on hosts without a secure source.
+values only when requested. `RawBsonRef` keeps nested values, string payloads,
+and binary payloads borrowed until `to_bson` is called. `BsonStreamDecoder` and
+`BsonStreamEncoder` handle arbitrarily split and batched frames. `ObjectId::new`
+uses OS/Web Crypto entropy and raises `UnsupportedEntropy` on hosts without a
+secure source. WASM hosts can install a secure callback with
+`install_secure_entropy_provider`; `src/wasm_entropy` is a small import adapter
+for hosts exposing the `secure_random_u32` function in the `moonbit:bson`
+WebAssembly import module.
 
 ## Development
 

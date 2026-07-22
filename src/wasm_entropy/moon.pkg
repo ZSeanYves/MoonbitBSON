@@ -1,0 +1,12 @@
+import {
+  "ZSeanYves/MoonbitBSON" @bson,
+}
+
+supported_targets = "wasm+wasm-gc"
+
+options(
+  "is-main": false,
+  targets: {
+    "provider.mbt": [ "wasm", "wasm-gc" ],
+  },
+)

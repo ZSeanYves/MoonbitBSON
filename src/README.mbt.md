@@ -81,3 +81,12 @@ test "borrowed view and split stream" {
   stream.finish()
 }
 ```
+
+`RawBsonRef` extends the borrowed API to nested documents, arrays, UTF-8 string
+payloads, and binary payloads. Values remain borrowed until the caller chooses
+`to_bson`, `to_document`, or `to_array`.
+
+MoonBit cannot derive user-defined traits with the compiler's built-in derive
+system. Use `tools/bson-derive.mjs` for checked-in serde-like implementations;
+the `/// @bson.derive` and `/// @bson.rename("...")` annotations are source-level
+metadata consumed by that generator.

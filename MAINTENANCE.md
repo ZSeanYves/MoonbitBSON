@@ -59,6 +59,8 @@
 - `RawDocumentView`、`RawElementView`、`BsonStreamDecoder` 和 `BsonStreamEncoder`：
   借用 `BytesView`，支持 zero-copy element ranges、任意 chunk 边界的 frame 解码和
   append-only frame 编码。
+- `RawBsonRef`、`RawStringRef`、`RawBinaryRef` 等 typed borrowed values：嵌套文档和数组
+  仍然保持借用，调用方通过 `to_bson`/`to_document`/`to_array` 显式 materialize。
 - typed accessors、`require_*` 和结构化 `BsonError`，避免调用方重复写 variant 匹配。
 - `tools/bson-codegen.mjs` 根据 schema 生成 `ToBson`/`FromBson`，并在 CI 检查生成结果
   没有漂移。
@@ -75,7 +77,8 @@
 - `tools/decimal128-differential.mjs` 对 Rust `bson` 3.1.0 运行随机 128-bit pattern
   差分，比较文本输出和重新编码结果。
 - `src/fuzz_driver` 加入 AFL++ 可执行 harness；CI 运行 native driver smoke，长期运行
-  由 `tools/fuzz-afl.sh` 启动。
+  由 `tools/fuzz-afl.sh` 启动；`.github/workflows/fuzz.yml` 每日运行 sanitizer 和
+  AFL++，push 事件执行 30 秒烟测并上传 findings artifact。
 
 本机 native release 当前测量：编码约 `19.29 us`，完整 Document 解码约 `16.35 us`，
 owned Raw 定点读取约 `6.29 us`，borrowed RawDocumentView 定点读取约 `3.53 us`。
@@ -83,18 +86,21 @@ owned Raw 定点读取约 `6.29 us`，borrowed RawDocumentView 定点读取约 `
 
 ## 与 Rust 成熟实现相比的后续方向
 
-0.3.0 follow-up 已覆盖本轮五项要求，但仍有明确差距：
+0.3.0 follow-up 已覆盖本轮选择的 1、2、3、5 项；Decimal128 跨语言扩展仍保留为后续项：
 
-1. MoonBit 仍不支持用户自定义 trait 的编译器 derive；当前 schema codegen 是显式
-   生成步骤，不是 `derive(ToBson)` 语法。
-2. Raw 视图已 zero-copy，但 typed borrowed values、borrowed String/UUID 等完整视图
-   层仍需单独设计；stream decoder 目前按完整 frame 返回 owned `Document`。
-3. Wasm 宿主若没有注入随机源只能安全失败；后续可增加标准 WASI/WebAssembly
-   `getrandom` adapter，而不能静默回退伪随机。
+1. MoonBit 仍不支持用户自定义 trait 的编译器 derive；新增 `tools/bson-derive.mjs` 提供
+   注释驱动的 serde-like 生成步骤，但它仍是显式 codegen，不是编译器原生
+   `derive(ToBson)` 语法。
+2. `RawBsonRef` 已覆盖 BSON value enum、嵌套 document/array、字符串和 binary payload
+   的 borrowed view；stream decoder 仍按完整 frame 返回 owned `Document`，可在后续版本
+   增加 `BsonStreamRawDecoder`。
+3. `install_secure_entropy_provider` 允许 WASM/WASM-GC 宿主注入安全随机源；配套
+   `src/wasm_entropy` 使用 WebAssembly import（宿主可接 WASI `random_get` 或 crypto）。
+   未安装 provider 时仍显式返回 `UnsupportedEntropy`，不会回退伪随机。
 4. Decimal128 已接入 Rust 随机 bit-pattern oracle，仍可扩展 Java/Go 实现并保存长期
    历史结果。
-5. AFL++ harness 已接入，但尚未配置专用 runner 的持续 fuzz 时长、崩溃 artifact 上传
-   和 sanitizer nightly 矩阵。
+5. 已配置 nightly/push sanitizer 与 AFL++ workflow、可配置 fuzz 时长和 findings artifact；
+   仍建议在仓库长期运行后把发现的 seeds 固化到 `testdata/bson-corpus`。
 
 这些项目适合作为 0.4 的破坏性设计窗口，而不是在 0.3 发布前引入未验证的复杂依赖。
 
@@ -107,6 +113,7 @@ moon test --target all --deny-warn --warn-list +73
 moon test --release --target all --deny-warn --warn-list +73
 moon bench --target native --release
 node tools/bson-codegen.mjs --check codegen/example.schema.json src/codegen_generated_test.mbt
+node tools/bson-derive.mjs --check src/derive_types_test.mbt src/derive_generated_test.mbt
 node tools/decimal128-differential.mjs
 moon build --target native --release src/fuzz_driver
 moon coverage analyze -- -f summary

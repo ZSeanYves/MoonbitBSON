@@ -21,6 +21,39 @@ test "RawDocumentView keeps borrowed element bytes" {
 }
 
 ///|
+test "RawBsonRef borrows nested values and materializes explicitly" {
+  let source = Document::new()
+    .set("text", String("borrowed"))
+    .set("bytes", Binary(Binary::new(Generic, b"abc")))
+    .set("nested", Document(Document::new().set("answer", Int32(42))))
+    .set("items", Array([Boolean(true), Int64(7L)]))
+  let view = RawDocumentView::from_bytes(source.to_bytes()[:])
+  match view.get("text").unwrap() {
+    String(value) => assert_eq(value.to_string(), "borrowed")
+    _ => fail("text was not a borrowed string")
+  }
+  match view.get("bytes").unwrap() {
+    Binary(value) => {
+      assert_eq(value.subtype(), Generic)
+      assert_true(value.bytes().equal_to_bytes(b"abc"))
+    }
+    _ => fail("bytes was not a borrowed binary")
+  }
+  match view.get("nested").unwrap() {
+    Document(value) =>
+      assert_eq(value.get("answer").unwrap().to_bson(), Int32(42))
+    _ => fail("nested value was not a borrowed document")
+  }
+  match view.get("items").unwrap() {
+    Array(value) => {
+      assert_eq(value.get(0).unwrap().to_bson(), Boolean(true))
+      assert_eq(value.get(1).unwrap().to_bson(), Int64(7L))
+    }
+    _ => fail("array value was not a borrowed array")
+  }
+}
+
+///|
 test "BsonStreamDecoder handles split and coalesced frames" {
   let first = Document::new().set("first", Boolean(true)).to_bytes()
   let second = Document::new().set("second", Int64(2L)).to_bytes()

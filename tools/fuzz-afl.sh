@@ -15,4 +15,19 @@ if [[ -z "${binary}" ]]; then
 fi
 
 mkdir -p tools/fuzz-corpus tools/fuzz-findings
-afl-fuzz -i tools/fuzz-corpus -o tools/fuzz-findings -- "${binary}" @@
+duration="${BSON_FUZZ_DURATION:-0}"
+if [[ "${duration}" == "0" ]]; then
+  exec afl-fuzz -i tools/fuzz-corpus -o tools/fuzz-findings -- "${binary}" @@
+fi
+
+set +e
+timeout --signal=TERM "${duration}s" afl-fuzz \
+  -i tools/fuzz-corpus \
+  -o tools/fuzz-findings \
+  -- "${binary}" @@
+status=$?
+set -e
+if [[ "${status}" -ne 0 && "${status}" -ne 124 && "${status}" -ne 143 ]]; then
+  echo "AFL++ exited with status ${status}" >&2
+  exit "${status}"
+fi

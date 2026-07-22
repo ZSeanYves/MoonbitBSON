@@ -4,6 +4,10 @@ extern "c" fn object_id_secure_random_ffi(buffer : Bytes) -> Int = "moonbit_bson
 
 ///|
 fn object_id_secure_random(count : Int) -> Bytes raise BsonError {
+  match secure_entropy_from_provider(count) {
+    Some(bytes) => return bytes
+    None => ()
+  }
   let buffer = Bytes::make(count, 0)
   if object_id_secure_random_ffi(buffer) != 0 {
     raise bson_error(

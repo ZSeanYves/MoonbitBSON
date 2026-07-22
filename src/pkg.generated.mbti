@@ -7,6 +7,8 @@ import {
 }
 
 // Values
+pub fn clear_secure_entropy_provider() -> Unit
+
 pub fn decode(Bytes) -> Document raise BsonError
 
 pub fn decode_prefix(BytesView) -> (Document, Int) raise BsonError
@@ -26,6 +28,10 @@ pub fn encode_to_with_options(Document, @buffer.Buffer, EncodeOptions) -> Unit r
 pub fn encode_with_options(Document, EncodeOptions) -> Bytes raise BsonError
 
 pub fn[T : FromBson] from_bson(Bson) -> T raise BsonError
+
+pub fn install_secure_entropy_provider((Int) -> Bytes?) -> Unit
+
+pub fn secure_entropy_from_provider(Int) -> Bytes? raise BsonError
 
 pub fn[T : ToBson] serialize_to_bytes(T) -> Bytes raise BsonError
 
@@ -278,6 +284,54 @@ pub fn ObjectId::to_hex(Self) -> String
 pub impl FromBson for ObjectId
 pub impl ToBson for ObjectId
 
+pub struct RawArrayView {
+  document : RawDocumentView
+} derive(Eq, @debug.Debug)
+pub fn RawArrayView::document(Self) -> RawDocumentView
+pub fn RawArrayView::from_bytes(BytesView) -> Self raise BsonError
+pub fn RawArrayView::get(Self, Int) -> RawBsonRef? raise BsonError
+pub fn RawArrayView::iter(Self) -> RawElementViewIter
+pub fn RawArrayView::to_array(Self) -> Array[Bson] raise BsonError
+
+pub struct RawBinaryRef {
+  subtype : BinarySubtype
+  bytes : BytesView
+} derive(Eq, @debug.Debug)
+pub fn RawBinaryRef::bytes(Self) -> BytesView
+pub fn RawBinaryRef::subtype(Self) -> BinarySubtype
+
+pub(all) enum RawBsonRef {
+  Double(Double)
+  String(RawStringRef)
+  Document(RawDocumentView)
+  Array(RawArrayView)
+  Binary(RawBinaryRef)
+  Undefined
+  ObjectId(BytesView)
+  Boolean(Bool)
+  DateTime(Int64)
+  Null
+  Regex(RawRegexRef)
+  DbPointer(RawDbPointerRef)
+  JavaScript(RawStringRef)
+  Symbol(RawStringRef)
+  JavaScriptWithScope(RawJavaScriptWithScopeRef)
+  Int32(Int)
+  Timestamp(Timestamp)
+  Int64(Int64)
+  Decimal128(BytesView)
+  MinKey
+  MaxKey
+} derive(Eq, @debug.Debug)
+pub fn RawBsonRef::to_bson(Self) -> Bson raise BsonError
+
+pub struct RawDbPointerRef {
+  namespace_value : RawStringRef
+  id : BytesView
+} derive(Eq, @debug.Debug)
+pub fn RawDbPointerRef::id_bytes(Self) -> BytesView
+pub fn RawDbPointerRef::namespace_value(Self) -> RawStringRef
+
 pub struct RawDocument {
   bytes : Bytes
 } derive(Eq, @debug.Debug)
@@ -295,8 +349,10 @@ pub struct RawDocumentView {
 pub fn RawDocumentView::bytes(Self) -> BytesView
 pub fn RawDocumentView::from_bytes(BytesView) -> Self raise BsonError
 pub fn RawDocumentView::from_prefix(BytesView) -> (Self, Int) raise BsonError
+pub fn RawDocumentView::get(Self, String) -> RawBsonRef? raise BsonError
 pub fn RawDocumentView::iter(Self) -> RawElementViewIter
 pub fn RawDocumentView::length(Self) -> Int
+pub fn RawDocumentView::to_document(Self) -> Document raise BsonError
 
 pub struct RawElement {
   document : RawDocument
@@ -330,6 +386,7 @@ pub fn RawElementView::key_bytes(Self) -> BytesView
 pub fn RawElementView::raw_bytes(Self) -> BytesView
 pub fn RawElementView::to_bson(Self) -> Bson raise BsonError
 pub fn RawElementView::type_code(Self) -> Byte
+pub fn RawElementView::value(Self) -> RawBsonRef raise BsonError
 
 pub struct RawElementViewIter {
   document : RawDocumentView
@@ -337,6 +394,27 @@ pub struct RawElementViewIter {
   end : Int
 }
 pub fn RawElementViewIter::next(Self) -> RawElementView? raise BsonError
+
+pub struct RawJavaScriptWithScopeRef {
+  code : RawStringRef
+  scope : RawDocumentView
+} derive(Eq, @debug.Debug)
+pub fn RawJavaScriptWithScopeRef::code(Self) -> RawStringRef
+pub fn RawJavaScriptWithScopeRef::scope(Self) -> RawDocumentView
+
+pub struct RawRegexRef {
+  pattern : BytesView
+  options : BytesView
+} derive(Eq, @debug.Debug)
+pub fn RawRegexRef::options(Self) -> BytesView
+pub fn RawRegexRef::pattern(Self) -> BytesView
+pub fn RawRegexRef::to_regex(Self) -> Regex raise BsonError
+
+pub struct RawStringRef {
+  bytes : BytesView
+} derive(Eq, @debug.Debug)
+pub fn RawStringRef::bytes(Self) -> BytesView
+pub fn RawStringRef::to_string(Self) -> String raise BsonError
 
 pub struct Regex {
   pattern : String
@@ -367,6 +445,7 @@ pub impl FromBson for Uuid
 pub impl ToBson for Uuid
 
 // Type aliases
+pub type SecureEntropyProvider = (Int) -> Bytes?
 
 // Traits
 pub(open) trait FromBson {

@@ -1,0 +1,16 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "ZSeanYves/MoonbitBSON/wasm_entropy"
+
+// Values
+pub fn clear() -> Unit
+
+pub fn install() -> Unit
+
+// Errors
+
+// Types and methods
+
+// Type aliases
+
+// Traits
+

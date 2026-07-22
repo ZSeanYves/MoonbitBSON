@@ -139,6 +139,18 @@ test "ObjectId new uses secure entropy or reports unsupported host" {
 }
 
 ///|
+test "secure entropy provider validates and returns host bytes" {
+  clear_secure_entropy_provider()
+  install_secure_entropy_provider(fn(count : Int) -> Bytes? {
+    Some(Bytes::make(count, 0xA5))
+  })
+  let entropy = secure_entropy_from_provider(8).unwrap()
+  assert_eq(entropy.length(), 8)
+  assert_eq(entropy[0], 0xA5)
+  clear_secure_entropy_provider()
+}
+
+///|
 test "generic BSON serialization traits" {
   let document = Document::new()
     .set("name", String("Ada"))

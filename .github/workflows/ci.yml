@@ -19,6 +19,7 @@ jobs:
       - run: moon test --release --target all --deny-warn --warn-list +73
       - run: moon bench --target native --release
       - run: node tools/bson-codegen.mjs --check codegen/example.schema.json src/codegen_generated_test.mbt
+      - run: node tools/bson-derive.mjs --check src/derive_types_test.mbt src/derive_generated_test.mbt
       - run: node tools/decimal128-differential.mjs
       - run: moon build --target native --release src/fuzz_driver
       - run: _build/native/release/build/fuzz_driver/fuzz_driver.exe tools/fuzz-corpus/seed.bson

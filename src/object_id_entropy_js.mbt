@@ -10,6 +10,10 @@ extern "js" fn object_id_secure_random_ffi(buffer : Bytes) -> Bool =
 
 ///|
 fn object_id_secure_random(count : Int) -> Bytes raise BsonError {
+  match secure_entropy_from_provider(count) {
+    Some(bytes) => return bytes
+    None => ()
+  }
   let buffer = Bytes::make(count, 0)
   if !object_id_secure_random_ffi(buffer) {
     raise bson_error(
