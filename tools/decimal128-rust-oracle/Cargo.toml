@@ -5,4 +5,4 @@ edition = "2021"
 publish = false
 
 [dependencies]
-bson = { version = "=3.1.0", default-features = false }
+bson = "=3.1.0"
