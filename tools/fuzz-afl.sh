@@ -22,6 +22,9 @@ afl_mode=()
 if [[ "${AFL_QEMU_MODE:-0}" == "1" ]]; then
   afl_mode+=("-Q")
 fi
+if [[ "${AFL_DUMB_MODE:-0}" == "1" ]]; then
+  afl_mode=("-n")
+fi
 if [[ "${duration}" == "0" ]]; then
   exec afl-fuzz "${afl_mode[@]}" -i tools/fuzz-corpus -o tools/fuzz-findings -- "${binary}" @@
 fi

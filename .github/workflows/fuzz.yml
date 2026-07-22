@@ -57,7 +57,7 @@ jobs:
             echo "clang build failed; retrying with MoonBit's default native compiler"
             moon build --target native --release src/fuzz_driver
           fi
-          AFL_QEMU_MODE=1 ./tools/fuzz-afl.sh
+          AFL_DUMB_MODE=1 ./tools/fuzz-afl.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
