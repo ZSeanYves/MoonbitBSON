@@ -161,6 +161,14 @@ pub fn BsonStreamEncoder::bytes(Self) -> Bytes
 pub fn BsonStreamEncoder::new(size_hint? : Int) -> Self
 pub fn BsonStreamEncoder::push(Self, Document) -> Unit raise BsonError
 
+pub struct BsonStreamRawDecoder {
+  mut pending : Bytes
+  max_size : Int
+} derive(@debug.Debug)
+pub fn BsonStreamRawDecoder::finish(Self) -> Unit raise BsonError
+pub fn BsonStreamRawDecoder::new(max_size? : Int) -> Self
+pub fn BsonStreamRawDecoder::push(Self, BytesView) -> Array[RawDocumentView] raise BsonError
+
 pub struct DateTime {
   milliseconds : Int64
 } derive(Eq, @debug.Debug)
