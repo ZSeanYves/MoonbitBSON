@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 maintenance follow-up (unreleased)
+
+### Added
+
+- Schema-driven `ToBson`/`FromBson` codegen with stale-output checking; this is
+  the serde-style integration supported by current MoonBit tooling because
+  user-defined traits cannot be compiler-derived.
+- Borrowed `RawDocumentView`/`RawElementView` APIs and a chunked
+  `BsonStreamDecoder` for split BSON frames.
+- OS/Web Crypto-backed `ObjectId::new` and `ObjectId::new_secure`; unsupported
+  hosts return `UnsupportedEntropy` instead of using a deterministic PRNG.
+- Rust `bson` 3.1.0 Decimal128 random bit-pattern differential oracle.
+- Native AFL++ decoder driver and long-running fuzz command, with CI smoke
+  coverage for the driver.
+
 ## 0.3.0 - 2026-07-22
 
 ### Added

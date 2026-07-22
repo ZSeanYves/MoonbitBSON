@@ -1,0 +1,8 @@
+[package]
+name = "moonbitbson-decimal128-oracle"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+bson = { version = "=3.1.0", default-features = false }

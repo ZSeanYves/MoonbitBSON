@@ -1,0 +1,12 @@
+{
+  "types": [
+    {
+      "name": "CodegenUser",
+      "fields": [
+        { "name": "name", "type": "String" },
+        { "name": "age", "type": "Int64", "rename": "age_years" },
+        { "name": "created", "type": "DateTime", "optional": true }
+      ]
+    }
+  ]
+}

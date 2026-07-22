@@ -15,4 +15,10 @@ import {
 
 options(
   "is-main": false,
+  "native-stub": [ "object_id_entropy_native.c" ],
+  targets: {
+    "object_id_entropy_native.mbt": [ "native" ],
+    "object_id_entropy_js.mbt": [ "js" ],
+    "object_id_entropy_portable.mbt": [ "wasm", "wasm-gc" ],
+  },
 )

@@ -11,12 +11,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: hustcer/setup-moonbit@v1.22
+      - uses: dtolnay/rust-toolchain@stable
       - run: moon version
       - run: moon fmt --check src
       - run: moon check --target all --deny-warn --warn-list +73
       - run: moon test --target all --deny-warn --warn-list +73
       - run: moon test --release --target all --deny-warn --warn-list +73
       - run: moon bench --target native --release
+      - run: node tools/bson-codegen.mjs --check codegen/example.schema.json src/codegen_generated_test.mbt
+      - run: node tools/decimal128-differential.mjs
+      - run: moon build --target native --release src/fuzz_driver
+      - run: _build/native/release/build/fuzz_driver/fuzz_driver.exe tools/fuzz-corpus/seed.bson
       - run: moon coverage analyze -- -f summary
       - run: moon info --target all
       - run: moon package --list

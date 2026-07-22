@@ -1,4 +1,6 @@
 target/
 _build/
+tools/fuzz-findings/
+tools/decimal128-rust-oracle/target/
 .mooncakes/
 .DS_Store

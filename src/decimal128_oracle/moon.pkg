@@ -1,0 +1,6 @@
+import {
+  "ZSeanYves/MoonbitBSON" @bson,
+  "moonbitlang/core/env",
+}
+
+pkgtype(kind: "executable")

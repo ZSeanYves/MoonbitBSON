@@ -1,0 +1,2 @@
+This seed is intentionally malformed BSON; AFL++ will mutate it into valid and
+invalid frames while exercising the native MoonBit decoder.

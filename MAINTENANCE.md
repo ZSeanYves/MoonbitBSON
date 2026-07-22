@@ -50,13 +50,18 @@
 - `DateTime`：UTC 毫秒值、RFC 3339 解析/格式化、Relaxed EJSON 转换。
 - `Uuid`：16 字节值、canonical/compact/URN 解析、BSON binary subtype 4。
 - `ObjectId`：12 字节构造、timestamp/process-unique/counter 分解和 hex 转换；
-  `ObjectId::new` 是 best-effort 本地生成器，安全随机源由调用方通过 `from_parts`
-  提供，避免把伪随机误标成密码学随机。
+  `ObjectId::new`/`new_secure` 使用系统或 Web Crypto 安全熵；没有熵源时返回
+  `UnsupportedEntropy`，`from_parts` 仍可用于注入外部唯一值。
 - `ToBson`/`FromBson` trait 和 bytes 序列化入口，覆盖常用标量、数组、Map、Option 以及
   BSON 专用类型。
 - `RawDocument::elements`、`get_element` 和 `RawElement`，支持保留 wire bytes 并按需
   解码单个值。
+- `RawDocumentView`、`RawElementView`、`BsonStreamDecoder` 和 `BsonStreamEncoder`：
+  借用 `BytesView`，支持 zero-copy element ranges、任意 chunk 边界的 frame 解码和
+  append-only frame 编码。
 - typed accessors、`require_*` 和结构化 `BsonError`，避免调用方重复写 variant 匹配。
+- `tools/bson-codegen.mjs` 根据 schema 生成 `ToBson`/`FromBson`，并在 CI 检查生成结果
+  没有漂移。
 
 ## 阶段 5：性能、属性测试与模糊测试
 
@@ -67,24 +72,29 @@
 - `src/property_test.mbt` 使用 core QuickCheck 生成 384 组标量/组合文档 round-trip，
   并运行 512 组可重复随机字节 decoder fuzz smoke。
 - `decode_prefix` 改为直接读取 `BytesView`，消除前缀解码的整帧复制。
+- `tools/decimal128-differential.mjs` 对 Rust `bson` 3.1.0 运行随机 128-bit pattern
+  差分，比较文本输出和重新编码结果。
+- `src/fuzz_driver` 加入 AFL++ 可执行 harness；CI 运行 native driver smoke，长期运行
+  由 `tools/fuzz-afl.sh` 启动。
 
-本机 native release 基线/优化后测量：编码约 `18.60 -> 18.49 us`，解码约
-`15.67 -> 15.57 us`，Raw 定点读取约 `6.31 -> 6.17 us`。这些数字用于回归比较，
-不是跨机器性能承诺。
+本机 native release 当前测量：编码约 `19.29 us`，完整 Document 解码约 `16.35 us`，
+owned Raw 定点读取约 `6.29 us`，borrowed RawDocumentView 定点读取约 `3.53 us`。
+这些数字用于回归比较，不是跨机器性能承诺。
 
 ## 与 Rust 成熟实现相比的后续方向
 
-0.3.0 已覆盖本轮要求，但仍有明确差距：
+0.3.0 follow-up 已覆盖本轮五项要求，但仍有明确差距：
 
-1. 尚无 Rust `serde` 同等的 derive/codegen 集成；当前 trait 是手写 opt-in 转换。
-2. 尚无真正 streaming encoder/decoder、borrowed typed views、RawBSON iterator 的
-   完整 zero-copy 设计；Raw API 目前只做到元素范围扫描和按需解码。
-3. ObjectId 默认生成器没有操作系统密码学熵源；跨进程生产环境应注入外部唯一的
-   process-unique bytes 和 counter。
-4. Decimal128 已覆盖文本转换和 corpus vectors，但仍应继续与更多语言实现做随机
-   bit-pattern differential test，并补充性能测量。
-5. 尚未接入长期运行的 libFuzzer/AFL harness、criterion 风格历史基线和自动兼容性
-   报告；当前 fuzz/property 套件是确定性 CI smoke。
+1. MoonBit 仍不支持用户自定义 trait 的编译器 derive；当前 schema codegen 是显式
+   生成步骤，不是 `derive(ToBson)` 语法。
+2. Raw 视图已 zero-copy，但 typed borrowed values、borrowed String/UUID 等完整视图
+   层仍需单独设计；stream decoder 目前按完整 frame 返回 owned `Document`。
+3. Wasm 宿主若没有注入随机源只能安全失败；后续可增加标准 WASI/WebAssembly
+   `getrandom` adapter，而不能静默回退伪随机。
+4. Decimal128 已接入 Rust 随机 bit-pattern oracle，仍可扩展 Java/Go 实现并保存长期
+   历史结果。
+5. AFL++ harness 已接入，但尚未配置专用 runner 的持续 fuzz 时长、崩溃 artifact 上传
+   和 sanitizer nightly 矩阵。
 
 这些项目适合作为 0.4 的破坏性设计窗口，而不是在 0.3 发布前引入未验证的复杂依赖。
 
@@ -96,6 +106,9 @@ moon check --target all --deny-warn --warn-list +73
 moon test --target all --deny-warn --warn-list +73
 moon test --release --target all --deny-warn --warn-list +73
 moon bench --target native --release
+node tools/bson-codegen.mjs --check codegen/example.schema.json src/codegen_generated_test.mbt
+node tools/decimal128-differential.mjs
+moon build --target native --release src/fuzz_driver
 moon coverage analyze -- -f summary
 moon info --target all
 moon package --list

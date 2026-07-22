@@ -79,10 +79,22 @@ Canonical 与 Relaxed Extended JSON 均使用标准 `$numberDecimal` 表示。
 
 `DateTime` 是类型化的 UTC 毫秒值，支持 RFC 3339 解析和格式化。`Uuid` 支持
 canonical、compact 和 URN 文本格式，以及 BSON binary subtype 4。`ObjectId::from_parts`
-允许调用方提供 timestamp、process-unique bytes 和 counter；`ObjectId::new` 提供
-本地 best-effort 生成器。
+允许调用方提供 timestamp、process-unique bytes 和 counter；`ObjectId::new` 使用
+OS/Web Crypto 安全熵，宿主无法提供时会明确失败。
 
 `ToBson` 和 `FromBson` 提供可选的泛型转换，支持数组、Map、Option 以及类型化 BSON 值。
+
+MoonBit 不允许把用户自定义 trait 放进编译器内置 `derive` 集合。需要类似 serde 的
+生成实现时，使用仓库内可检查的 schema codegen 工具：
+
+```bash
+node tools/bson-codegen.mjs codegen/example.schema.json src/codegen_generated_test.mbt
+```
+
+`RawDocumentView` 和 `RawElementView` 保留 `BytesView` 切片，只在显式请求时解码值。
+`BsonStreamDecoder` 和 `BsonStreamEncoder` 支持任意边界拆分和批量 frame。
+`ObjectId::new` 使用 OS/Web Crypto 安全熵；没有安全熵的宿主会返回
+`UnsupportedEntropy`。
 
 ## 开发与验证
 
@@ -93,6 +105,8 @@ moon test --target all --deny-warn --warn-list +73
 moon test --release --target all --deny-warn --warn-list +73
 moon bench --target native --release
 moon coverage analyze -- -f summary
+node tools/bson-codegen.mjs --check codegen/example.schema.json src/codegen_generated_test.mbt
+node tools/decimal128-differential.mjs
 moon info --target all
 moon package --list
 ```
@@ -103,6 +117,7 @@ Canonical/Relaxed Extended JSON。
 
 0.3.0 破坏性迁移见 [CHANGELOG.md](CHANGELOG.md)，实现状态和剩余工作见
 [MAINTENANCE.md](MAINTENANCE.md)。
+长期 native AFL++ decoder harness 见 [tools/README.md](tools/README.md)。
 
 ## 许可证
 

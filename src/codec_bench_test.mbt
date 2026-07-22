@@ -57,3 +57,28 @@ test "bench RawDocument lazy element lookup" (it : @bench.T) {
   let raw = RawDocument::from_bytes(benchmark_encode(benchmark_document()))
   it.bench(fn() { it.keep(benchmark_raw_lookup(raw)) })
 }
+
+///|
+fn benchmark_raw_view_lookup(view : RawDocumentView) -> BytesView {
+  try {
+    let iterator = view.iter()
+    while iterator.next() is Some(element) {
+      if element.key() == "field_96" {
+        return element.raw_bytes()
+      }
+    }
+    abort("benchmark field missing")
+  } catch {
+    _ => abort("benchmark raw view lookup failed")
+  } noraise {
+    value => value
+  }
+}
+
+///|
+test "bench borrowed RawDocumentView lookup" (it : @bench.T) {
+  let view = RawDocumentView::from_bytes(
+    benchmark_encode(benchmark_document())[:],
+  )
+  it.bench(fn() { it.keep(benchmark_raw_view_lookup(view)) })
+}

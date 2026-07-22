@@ -138,7 +138,22 @@ pub(all) enum BsonErrorKind {
   SizeLimit
   InvalidExtendedJson
   TypeMismatch
+  UnsupportedEntropy
 } derive(Eq, @debug.Debug)
+
+pub struct BsonStreamDecoder {
+  mut pending : Bytes
+} derive(@debug.Debug)
+pub fn BsonStreamDecoder::finish(Self) -> Unit raise BsonError
+pub fn BsonStreamDecoder::new() -> Self
+pub fn BsonStreamDecoder::push(Self, BytesView) -> Array[Document] raise BsonError
+
+pub struct BsonStreamEncoder {
+  buffer : @buffer.Buffer
+}
+pub fn BsonStreamEncoder::bytes(Self) -> Bytes
+pub fn BsonStreamEncoder::new(size_hint? : Int) -> Self
+pub fn BsonStreamEncoder::push(Self, Document) -> Unit raise BsonError
 
 pub struct DateTime {
   milliseconds : Int64
@@ -256,7 +271,8 @@ pub fn ObjectId::bytes(Self) -> Bytes
 pub fn ObjectId::from_bytes(Bytes) -> Self raise BsonError
 pub fn ObjectId::from_hex(String) -> Self raise BsonError
 pub fn ObjectId::from_parts(UInt, Bytes, UInt) -> Self raise BsonError
-pub fn ObjectId::new() -> Self
+pub fn ObjectId::new() -> Self raise BsonError
+pub fn ObjectId::new_secure() -> Self raise BsonError
 pub fn ObjectId::timestamp(Self) -> DateTime
 pub fn ObjectId::to_hex(Self) -> String
 pub impl FromBson for ObjectId
@@ -273,6 +289,15 @@ pub fn RawDocument::get_element(Self, String) -> RawElement? raise BsonError
 pub fn RawDocument::to_document(Self) -> Document raise BsonError
 pub fn RawDocument::view(Self) -> BytesView
 
+pub struct RawDocumentView {
+  bytes : BytesView
+} derive(Eq, @debug.Debug)
+pub fn RawDocumentView::bytes(Self) -> BytesView
+pub fn RawDocumentView::from_bytes(BytesView) -> Self raise BsonError
+pub fn RawDocumentView::from_prefix(BytesView) -> (Self, Int) raise BsonError
+pub fn RawDocumentView::iter(Self) -> RawElementViewIter
+pub fn RawDocumentView::length(Self) -> Int
+
 pub struct RawElement {
   document : RawDocument
   key : String
@@ -284,6 +309,34 @@ pub fn RawElement::key(Self) -> String
 pub fn RawElement::raw_bytes(Self) -> BytesView
 pub fn RawElement::to_bson(Self) -> Bson raise BsonError
 pub fn RawElement::type_code(Self) -> Byte
+
+pub struct RawElementView {
+  document : RawDocumentView
+  key_start : Int
+  key_end : Int
+  type_code : Byte
+  value_start : Int
+  value_end : Int
+} derive(Eq, @debug.Debug)
+pub fn RawElementView::as_binary_bytes(Self) -> (BinarySubtype, BytesView)? raise BsonError
+pub fn RawElementView::as_bool(Self) -> Bool? raise BsonError
+pub fn RawElementView::as_datetime_millis(Self) -> Int64? raise BsonError
+pub fn RawElementView::as_double(Self) -> Double? raise BsonError
+pub fn RawElementView::as_int32(Self) -> Int? raise BsonError
+pub fn RawElementView::as_int64(Self) -> Int64? raise BsonError
+pub fn RawElementView::as_string_bytes(Self) -> BytesView? raise BsonError
+pub fn RawElementView::key(Self) -> String raise BsonError
+pub fn RawElementView::key_bytes(Self) -> BytesView
+pub fn RawElementView::raw_bytes(Self) -> BytesView
+pub fn RawElementView::to_bson(Self) -> Bson raise BsonError
+pub fn RawElementView::type_code(Self) -> Byte
+
+pub struct RawElementViewIter {
+  document : RawDocumentView
+  mut position : Int
+  end : Int
+}
+pub fn RawElementViewIter::next(Self) -> RawElementView? raise BsonError
 
 pub struct Regex {
   pattern : String

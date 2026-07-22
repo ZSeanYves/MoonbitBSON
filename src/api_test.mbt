@@ -130,6 +130,15 @@ test "typed DateTime ObjectId and UUID APIs" {
 }
 
 ///|
+test "ObjectId new uses secure entropy or reports unsupported host" {
+  try ObjectId::new() catch {
+    Failure(info) => assert_eq(info.kind(), UnsupportedEntropy)
+  } noraise {
+    value => assert_eq(value.bytes().length(), 12)
+  }
+}
+
+///|
 test "generic BSON serialization traits" {
   let document = Document::new()
     .set("name", String("Ada"))

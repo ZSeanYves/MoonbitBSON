@@ -19,6 +19,7 @@ pub(all) enum BsonErrorKind {
   SizeLimit
   InvalidExtendedJson
   TypeMismatch
+  UnsupportedEntropy
 } derive(Eq, Debug)
 
 ///|

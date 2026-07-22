@@ -1,28 +1,37 @@
 ///|
-let object_id_process_unique : Bytes = {
-  let time = @env.now()
-  let seed = Bytes::makei(32, index => {
-    let mixed = time ^ (index.to_uint64() * 0x9E3779B97F4A7C15UL)
-    (mixed >> (index % 8 * 8)).to_byte()
-  })
-  let random = @random.Rand::chacha8(seed~)
-  Bytes::makei(5, _ => random.uint(limit=256U).to_byte())
+let object_id_initial : (Bytes, UInt)? = None
+
+///|
+let object_id_state : Ref[(Bytes, UInt)?] = @ref.new(object_id_initial)
+
+///|
+/// Generate an ObjectId using an OS/Web Crypto secure random process value and
+/// counter seed. Portable Wasm without a host entropy provider raises
+/// `UnsupportedEntropy`; it never falls back to a deterministic PRNG.
+pub fn ObjectId::new() -> ObjectId raise BsonError {
+  let timestamp = (@env.now() / 1000UL).to_uint()
+  let (process_unique, counter) = match object_id_state.val {
+    Some(state) => state
+    None => {
+      let entropy = object_id_secure_random(8)
+      let process_unique = entropy[0:5].to_owned()
+      let counter = (entropy[5].to_uint() << 16) |
+        (entropy[6].to_uint() << 8) |
+        entropy[7].to_uint()
+      object_id_state.val = Some((process_unique, counter))
+      (process_unique, counter)
+    }
+  }
+  object_id_state.val = Some((process_unique, (counter + 1U) & 0xFFFFFFU))
+  ObjectId::from_valid_bytes(
+    object_id_bytes(timestamp, process_unique, counter),
+  )
 }
 
 ///|
-let object_id_counter : Ref[UInt] = @ref.new(@env.now().to_uint() & 0xFFFFFFU)
-
-///|
-/// Generate a best-effort local ObjectId from the current Unix time, a process
-/// value, and a monotonically increasing 24-bit counter. Callers that require
-/// externally sourced process uniqueness should use `ObjectId::from_parts`.
-pub fn ObjectId::new() -> ObjectId {
-  let timestamp = (@env.now() / 1000UL).to_uint()
-  let counter = object_id_counter.val
-  object_id_counter.val = (counter + 1U) & 0xFFFFFFU
-  ObjectId::from_valid_bytes(
-    object_id_bytes(timestamp, object_id_process_unique, counter),
-  )
+/// Explicit alias for callers that want to document the entropy requirement.
+pub fn ObjectId::new_secure() -> ObjectId raise BsonError {
+  ObjectId::new()
 }
 
 ///|

@@ -87,11 +87,24 @@ Extended JSON both use the standard `$numberDecimal` representation.
 `DateTime` is a typed UTC millisecond value with RFC 3339 parsing and
 formatting. `Uuid` supports canonical, compact, and URN text forms and BSON
 binary subtype 4. `ObjectId::from_parts` accepts caller-controlled timestamp,
-process-unique bytes, and counter values; `ObjectId::new` provides a
-best-effort local generator.
+process-unique bytes, and counter values; `ObjectId::new` uses OS/Web Crypto
+entropy and fails explicitly when the host cannot provide it.
 
 `ToBson` and `FromBson` provide opt-in generic conversions for application
 types, including arrays, maps, options, and the typed BSON values.
+
+MoonBit does not allow user-defined traits in the compiler's built-in `derive`
+set. For serde-style generated implementations, use the checked-in schema
+codegen tool:
+
+```bash
+node tools/bson-codegen.mjs codegen/example.schema.json src/codegen_generated_test.mbt
+```
+
+`RawDocumentView` and `RawElementView` retain `BytesView` slices and decode
+values only when requested. `BsonStreamDecoder` and `BsonStreamEncoder` handle
+arbitrarily split and batched frames. `ObjectId::new` uses OS/Web Crypto entropy and raises
+`UnsupportedEntropy` on hosts without a secure source.
 
 ## Development
 
@@ -102,6 +115,8 @@ moon test --target all --deny-warn --warn-list +73
 moon test --release --target all --deny-warn --warn-list +73
 moon bench --target native --release
 moon coverage analyze -- -f summary
+node tools/bson-codegen.mjs --check codegen/example.schema.json src/codegen_generated_test.mbt
+node tools/decimal128-differential.mjs
 moon info --target all
 moon package --list
 ```
@@ -113,6 +128,8 @@ Decimal128 text vectors, and Canonical/Relaxed Extended JSON.
 
 See [CHANGELOG.md](CHANGELOG.md) for the breaking 0.3.0 migration and
 [MAINTENANCE.md](MAINTENANCE.md) for implementation status and remaining work.
+The long-running native AFL++ decoder harness is documented in
+[tools/README.md](tools/README.md).
 
 ## License
 

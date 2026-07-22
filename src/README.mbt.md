@@ -65,3 +65,19 @@ test "typed and raw APIs" {
   assert_eq(decoded.require_uuid("request_id"), uuid)
 }
 ```
+
+For high-throughput framing, keep the input allocation alive and use the
+borrowed view or stream decoder:
+
+```mbt check
+///|
+test "borrowed view and split stream" {
+  let bytes = Document::new().set("ok", Boolean(true)).to_bytes()
+  let view = RawDocumentView::from_bytes(bytes[:])
+  assert_eq(view.iter().next().unwrap().key(), "ok")
+  let stream = BsonStreamDecoder::new()
+  assert_eq(stream.push(bytes[:2]).length(), 0)
+  assert_eq(stream.push(bytes[2:])[0].require_bool("ok"), true)
+  stream.finish()
+}
+```
