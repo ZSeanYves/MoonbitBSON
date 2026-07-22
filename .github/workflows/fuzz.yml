@@ -52,7 +52,9 @@ jobs:
       - name: Build and run AFL++ harness
         run: |
           chmod +x tools/fuzz-afl.sh
-          MOON_CC=afl-clang-fast moon build --target native --release src/fuzz_driver
+          AFL_CC_PATH="$(command -v afl-clang-fast)"
+          echo "Using AFL compiler: ${AFL_CC_PATH}"
+          MOON_CC="${AFL_CC_PATH}" moon build --target native --release src/fuzz_driver
           ./tools/fuzz-afl.sh
       - uses: actions/upload-artifact@v4
         if: always()

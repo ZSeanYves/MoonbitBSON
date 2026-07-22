@@ -8,13 +8,15 @@ fi
 
 moon build --target native --release src/fuzz_driver
 
+mkdir -p tools/fuzz-findings
 binary="$(find _build -type f \( -name 'fuzz_driver' -o -name 'fuzz_driver.exe' \) -perm -111 | head -n 1)"
 if [[ -z "${binary}" ]]; then
+  find _build -type f -path '*fuzz_driver*' -print >&2 || true
   echo "MoonBit fuzz driver executable was not found under _build" >&2
   exit 1
 fi
 
-mkdir -p tools/fuzz-corpus tools/fuzz-findings
+mkdir -p tools/fuzz-corpus
 duration="${BSON_FUZZ_DURATION:-0}"
 if [[ "${duration}" == "0" ]]; then
   exec afl-fuzz -i tools/fuzz-corpus -o tools/fuzz-findings -- "${binary}" @@
