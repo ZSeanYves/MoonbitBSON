@@ -39,8 +39,9 @@ BSON_FUZZ_DURATION=900 ./tools/fuzz-afl.sh
 
 The driver treats every decode failure as an expected input result. A process
 crash, sanitizer finding, or non-zero exit is therefore a fuzz regression. The
-timed runner stops AFL++ with SIGINT so a normal smoke timeout is not confused
-with a target failure. The
+timed runner stops AFL++ with SIGINT and recognizes its status-1 return only
+after the complete configured smoke window; an early status-1 exit remains a
+failure. The
 nightly GitHub Actions workflow runs the native driver with ASan/UBSan and
 uploads `tools/fuzz-findings` and sanitizer logs as artifacts. Push-triggered
 runs use a short 30-second smoke duration; scheduled runs use 900 seconds.
