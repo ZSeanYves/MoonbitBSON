@@ -18,12 +18,16 @@ fi
 
 mkdir -p tools/fuzz-corpus
 duration="${BSON_FUZZ_DURATION:-0}"
+afl_mode=()
+if [[ "${AFL_QEMU_MODE:-0}" == "1" ]]; then
+  afl_mode+=("-Q")
+fi
 if [[ "${duration}" == "0" ]]; then
-  exec afl-fuzz -i tools/fuzz-corpus -o tools/fuzz-findings -- "${binary}" @@
+  exec afl-fuzz "${afl_mode[@]}" -i tools/fuzz-corpus -o tools/fuzz-findings -- "${binary}" @@
 fi
 
 set +e
-timeout --signal=TERM "${duration}s" afl-fuzz \
+timeout --signal=TERM "${duration}s" afl-fuzz "${afl_mode[@]}" \
   -i tools/fuzz-corpus \
   -o tools/fuzz-findings \
   -- "${binary}" @@
