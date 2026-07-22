@@ -30,13 +30,15 @@ if [[ "${duration}" == "0" ]]; then
 fi
 
 set +e
-timeout --signal=TERM "${duration}s" afl-fuzz "${afl_mode[@]}" \
+# AFL++ documents SIGINT (Ctrl-C) as the graceful stop signal. SIGTERM can
+# make afl-fuzz return 1 after a timed smoke run, which looks like a crash.
+timeout --signal=INT --kill-after=5s "${duration}s" afl-fuzz "${afl_mode[@]}" \
   -i tools/fuzz-corpus \
   -o tools/fuzz-findings \
   -- "${binary}" @@
 status=$?
 set -e
-if [[ "${status}" -ne 0 && "${status}" -ne 124 && "${status}" -ne 143 ]]; then
+if [[ "${status}" -ne 0 && "${status}" -ne 124 && "${status}" -ne 130 && "${status}" -ne 143 ]]; then
   echo "AFL++ exited with status ${status}" >&2
   exit "${status}"
 fi
